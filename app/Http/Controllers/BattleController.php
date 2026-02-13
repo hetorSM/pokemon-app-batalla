@@ -111,12 +111,20 @@ class BattleController extends Controller
             $aiTeam = $this->battleService->generateRandomTeam($request->team_size, $level);
         }
 
-        // Objetos básicos para ambos
-        // Objetos para ambos (todos los disponibles, sandbox mode)
-        $allItems = $this->itemService->getAvailableItems();
+        // Objetos "Starter Kit" para batalla local (Limitados)
+        $starterKit = [
+            1 => 2, // Poción (x2)
+            2 => 1, // Superpoción (x1)
+            11 => 1, // Revivir (x1)
+            13 => 1, // Ataque X (x1)
+        ];
+
         $sandboxItems = [];
-        foreach ($allItems as $item) {
-            $sandboxItems[] = array_merge($item, ['quantity' => 10]);
+        foreach ($starterKit as $id => $qty) {
+            $item = $this->itemService->getItem($id);
+            if ($item) {
+                $sandboxItems[] = array_merge($item, ['quantity' => $qty]);
+            }
         }
 
         $battleData = [

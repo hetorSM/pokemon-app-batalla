@@ -115,24 +115,26 @@ class AIService
         $playerPokemon = $playerTeam[$playerActiveIndex];
         $hpRatio = $aiPokemon['current_hp'] / ($aiPokemon['max_hp'] ?? $aiPokemon['battle_stats']['hp']);
 
-        // Prioridad 1: Usar objeto de curación si HP < 30% y tiene items
-        if ($hpRatio < 0.30 && !empty($aiItems)) {
+        // Prioridad 1: Usar objeto de curación si HP < 50% y tiene items (Más agresivo)
+        if ($hpRatio < 0.50 && !empty($aiItems)) {
             $healItem = $this->findBestHealItem($aiItems, $aiPokemon);
             if ($healItem !== null) {
                 return ['action' => 'item', 'item_id' => $healItem, 'target_index' => $aiActiveIndex];
             }
         }
 
-        // Prioridad 2: Cambiar si en desventaja de tipo grave
+        // Prioridad 2: Cambiar si en desventaja de tipo grave O si tiene poca vida y ventaja nula
         $bestPlayerEffectiveness = 0;
         foreach ($playerPokemon['types'] ?? [] as $pType) {
             $eff = $this->battleService->getTypeEffectiveness($pType, $aiPokemon['types'] ?? []);
             $bestPlayerEffectiveness = max($bestPlayerEffectiveness, $eff);
         }
 
-        if ($bestPlayerEffectiveness >= 2 || $hpRatio < 0.2) {
+        // Si el jugador es muy efectivo (x2 o x4) O si la IA tiene < 40% de vida
+        if ($bestPlayerEffectiveness >= 2 || $hpRatio < 0.4) {
             $switchTarget = $this->findBetterSwitch($aiTeam, $aiActiveIndex, $playerPokemon);
-            if ($switchTarget !== false) {
+            // Solo cambiar si el objetivo tiene buena vida (>50%)
+            if ($switchTarget !== false && ($aiTeam[$switchTarget]['current_hp'] / $aiTeam[$switchTarget]['max_hp']) > 0.5) {
                 return ['action' => 'switch', 'target' => $switchTarget];
             }
         }
