@@ -296,10 +296,190 @@
         }
     </style>
 
+    <!-- Global Loader Styles -->
+    <style>
+        #global-loader {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            /* Changed from full screen to corner */
+            width: auto;
+            min-width: 150px;
+            height: auto;
+            background: rgba(15, 17, 21, 0.9);
+            border: 1px solid #333;
+            border-left: 4px solid #cc0000;
+            border-radius: 8px;
+            padding: 10px 15px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        #global-loader.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .loader-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: left;
+            width: 100%;
+        }
+
+        .loader-pokeball {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #fff;
+            background: linear-gradient(to bottom, #cc0000 50%, #fff 50%);
+            border-radius: 50%;
+            position: relative;
+            animation: spin-loader 0.8s linear infinite;
+            box-shadow: none;
+            margin: 0;
+        }
+
+        .loader-pokeball::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #333;
+            transform: translateY(-50%);
+        }
+
+        .loader-pokeball::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: #fff;
+            border: 2px solid #333;
+            border-radius: 50%;
+            box-shadow: none;
+        }
+
+        .loader-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: #fff;
+            text-transform: uppercase;
+            animation: none;
+        }
+
+        /* Full Screen Override */
+        #global-loader.full-screen {
+            bottom: 0;
+            right: 0;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: rgba(15, 17, 21, 0.95);
+            backdrop-filter: blur(5px);
+            justify-content: center;
+            border-radius: 0;
+            border: none;
+            transform: none;
+        }
+
+        #global-loader.full-screen .loader-content {
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+
+        #global-loader.full-screen .loader-pokeball {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 20px;
+            border-width: 4px;
+        }
+
+        #global-loader.full-screen .loader-pokeball::before {
+            height: 4px;
+        }
+
+        #global-loader.full-screen .loader-pokeball::after {
+            width: 20px;
+            height: 20px;
+            border-width: 4px;
+        }
+
+        #global-loader.full-screen .loader-text {
+            font-size: 16px;
+            letter-spacing: 4px;
+            animation: pulse-text 1.5s infinite;
+        }
+
+        /* Transparent blocker for clicks if needed, separate from visual loader */
+        #input-blocker {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9998;
+            display: none;
+            cursor: wait;
+        }
+
+        #input-blocker.active {
+            display: block;
+        }
+
+        @keyframes spin-loader {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes pulse-text {
+
+            0%,
+            100% {
+                opacity: 0.6;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+    </style>
+
     @stack('styles')
 </head>
 
 <body>
+    <!-- Input Blocker (Invisible but prevents double-clicks) -->
+    <div id="input-blocker"></div>
+
+    <!-- Global Loader Overlay (Visual only, bottom right) -->
+    <div id="global-loader">
+        <div class="loader-content">
+            <div class="loader-pokeball"></div>
+            <div class="loader-text">Procesando...</div>
+        </div>
+    </div>
+
     <!-- Navbar Pokémon -->
     <nav class="navbar navbar-expand-lg navbar-dark pokemon-navbar">
         <div class="container">
@@ -405,6 +585,65 @@
                 badge.addEventListener('mouseleave', function () {
                     this.style.transform = 'scale(1)';
                 });
+            });
+        });
+    </script>
+
+    <!-- Global Loader Script -->
+    <script>
+        let loadingTimeout;
+
+        window.showLoadingScreen = function (mode = 'mini') {
+            // mode: 'mini' (default, bottom-right) or 'full' (centered overlay)
+
+            // Only show if the operation takes longer than 300ms to avoid flickering
+            loadingTimeout = setTimeout(() => {
+                const loader = document.getElementById('global-loader');
+                const blocker = document.getElementById('input-blocker');
+
+                if (loader) {
+                    if (mode === 'full') {
+                        loader.classList.add('full-screen');
+                        loader.querySelector('.loader-text').innerText = 'CARGANDO...';
+                    } else {
+                        loader.classList.remove('full-screen');
+                        loader.querySelector('.loader-text').innerText = 'PROCESANDO...';
+                    }
+                    loader.classList.add('visible');
+                }
+
+                if (blocker) blocker.classList.add('active');
+            }, 300);
+        };
+
+        window.hideLoadingScreen = function () {
+            // Cancel the showing if it finishes quickly
+            if (loadingTimeout) clearTimeout(loadingTimeout);
+
+            const loader = document.getElementById('global-loader');
+            const blocker = document.getElementById('input-blocker');
+            if (loader) loader.classList.remove('visible');
+            if (blocker) blocker.classList.remove('active');
+        };
+
+        // Auto-show on navigation (FULL SCREEN mode for page loads)
+        document.addEventListener('DOMContentLoaded', () => {
+            // Intercept links to show loader (excluding external links or anchors)
+            document.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    const href = link.getAttribute('href');
+                    if (href && !href.startsWith('#') && !href.startsWith('javascript') && link.target !== '_blank') {
+                        // Don't show if holding ctrl/cmd key (opening in new tab)
+                        if (!e.ctrlKey && !e.metaKey) {
+                            window.showLoadingScreen('full');
+                        }
+                    }
+                });
+            });
+
+            // Also hide on pageshow (for back button cache history)
+            window.addEventListener('pageshow', () => {
+                window.hideLoadingScreen();
             });
         });
     </script>

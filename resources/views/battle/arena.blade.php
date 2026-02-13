@@ -127,7 +127,7 @@
                     <button class="menu-btn btn-bag" onclick="showPanel('items', '{{ $side }}')">MOCHILA</button>
                     <button class="menu-btn btn-pokemon" onclick="showPanel('switch', '{{ $side }}')">POKÉMON</button>
                     <button class="menu-btn btn-run"
-                        onclick="if(confirm('¿Huir de la batalla?')) window.location='{{ route('battle.finish') }}'">HUIR</button>
+                        onclick="if(confirm('¿Huir de la batalla?')) { if(window.showLoadingScreen) window.showLoadingScreen(); window.location='{{ route('battle.finish') }}'; }">HUIR</button>
                 </div>
 
                 {{-- MOVES PANEL --}}
@@ -1211,6 +1211,7 @@
     function performAction(action, data, side) {
         if (isProcessing) return;
         isProcessing = true;
+        if (window.showLoadingScreen) window.showLoadingScreen();
 
         const msgBox = document.getElementById('messageText');
         if (msgBox) msgBox.textContent = 'Procesando...';
@@ -1224,6 +1225,7 @@
         })
             .then(r => r.json())
             .then(data => {
+                if (window.hideLoadingScreen) window.hideLoadingScreen();
                 if (data.error) {
                     if (msgBox) msgBox.textContent = data.error;
                     isProcessing = false;
@@ -1248,6 +1250,7 @@
                 });
             })
             .catch(err => {
+                if (window.hideLoadingScreen) window.hideLoadingScreen();
                 console.error('Battle error:', err);
                 if (msgBox) msgBox.textContent = 'Error de conexión. Intenta de nuevo.';
                 isProcessing = false;
@@ -1561,6 +1564,10 @@
 
     // --- AI Action ---
     function triggerAIAction() {
+        if (isProcessing) return; // Prevent overlapping actions
+        isProcessing = true;
+
+        if (window.showLoadingScreen) window.showLoadingScreen();
         const msgBox = document.getElementById('messageText');
         if (msgBox) msgBox.textContent = 'La IA está pensando...';
 
@@ -1571,17 +1578,22 @@
         })
             .then(r => r.json())
             .then(data => {
+                if (window.hideLoadingScreen) window.hideLoadingScreen();
                 if (data.error) {
                     if (msgBox) msgBox.textContent = data.error;
+                    isProcessing = false;
                     return;
                 }
                 showMessages(data.messages || [], () => {
                     updateBattleUI(data);
+                    isProcessing = false;
                 });
             })
             .catch(err => {
+                if (window.hideLoadingScreen) window.hideLoadingScreen();
                 console.error('AI action error:', err);
                 if (msgBox) msgBox.textContent = 'Error de IA. Recargando...';
+                isProcessing = false;
                 setTimeout(() => location.reload(), 2000);
             });
     }
