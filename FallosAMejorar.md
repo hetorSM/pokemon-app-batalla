@@ -11,6 +11,7 @@ Estas mejoras ya han sido implementadas y verificadas.
 4.  **Observabilidad:** Agregados logs de error en `PokemonHelper` para evitar fallos silenciosos.
 5.  **Números Mágicos:** Creada constante `Pokemon::MAX_ID` (1025) y reemplazada en `BattleService` y `PokemonHelper`.
 6.  **Internacionalización:** Creado `lang/es/battle.php` y eliminados textos hardcodeados en `BattleController` y `BattleService`. Configurado `APP_LOCALE=es`.
+7.  **Limpieza Frontend (CSS):** Extraído todo el CSS embebido de las vistas (`battle`, `pokedex`, `team`, `layouts`, `welcome`) a archivos CSS estáticos en `public/css/`.
 
 ---
 
@@ -18,11 +19,7 @@ Estas mejoras ya han sido implementadas y verificadas.
 
 Para evitar romper el proyecto ("muerte por actualización masiva"), abordaremos los problemas complejos dividiéndolos en pequeñas operaciones seguras que no cambien la lógica principal de golpe.
 
-### Fase 1.1: Limpieza Frontend (CSS Faltante)
-*Objetivo: Eliminar todo el CSS embebido de las vistas restantes.*
-- [x] **Battle Setup:** Extraer CSS de `battle/setup-ai.blade.php`, `battle/setup-multiplayer.blade.php` y `battle/select-mode.blade.php`.
-- [x] **Pokedex & Team:** Extraer CSS de `pokedex/items.blade.php`, `pokemon/index.blade.php`, `pokemon/show.blade.php` y `team/index.blade.php`.
-- [x] **Layouts:** Revisar `welcome.blade.php` y `layouts/app.blade.php` (IMPORTANTE: `app.blade.php` define estilos globales, tener cuidado al mover).
+
 
 ### Fase 2: Reducción del Monolito (BattleController) - Parte 1
 *Objetivo: Extraer lógica auxiliar sin romper el flujo principal.*
