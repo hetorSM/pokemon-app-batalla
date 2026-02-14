@@ -9,6 +9,8 @@ Estas mejoras ya han sido implementadas y verificadas.
 2.  **Configuración:** Colores de Tipos movidos a `config/pokemon.php`.
 3.  **Lógica de Vistas:** Cálculos de HP y clases CSS movidos de la vista al Controlador.
 4.  **Observabilidad:** Agregados logs de error en `PokemonHelper` para evitar fallos silenciosos.
+5.  **Números Mágicos:** Creada constante `Pokemon::MAX_ID` (1025) y reemplazada en `BattleService` y `PokemonHelper`.
+6.  **Internacionalización:** Creado `lang/es/battle.php` y eliminados textos hardcodeados en `BattleController` y `BattleService`. Configurado `APP_LOCALE=es`.
 
 ---
 
@@ -16,10 +18,11 @@ Estas mejoras ya han sido implementadas y verificadas.
 
 Para evitar romper el proyecto ("muerte por actualización masiva"), abordaremos los problemas complejos dividiéndolos en pequeñas operaciones seguras que no cambien la lógica principal de golpe.
 
-### Fase 1: Limpieza de "Números Mágicos" y Constantes
-*Objetivo: Eliminar valores hardcodeados dispersos sin tocar lógica compleja.*
-- [ ] **Límite de Pokémon (1025):** Mover este número hardcodeado en `BattleService` y otros lugares a una constante en el modelo `Pokemon` o config.
-- [ ] **Mensajes de Texto:** Identificar textos fijos en `BattleController` (ej: mensajes de log de batalla) y moverlos a archivos de traducción o constantes para facilitar cambios futuros.
+### Fase 1.1: Limpieza Frontend (CSS Faltante)
+*Objetivo: Eliminar todo el CSS embebido de las vistas restantes.*
+- [x] **Battle Setup:** Extraer CSS de `battle/setup-ai.blade.php`, `battle/setup-multiplayer.blade.php` y `battle/select-mode.blade.php`.
+- [x] **Pokedex & Team:** Extraer CSS de `pokedex/items.blade.php`, `pokemon/index.blade.php`, `pokemon/show.blade.php` y `team/index.blade.php`.
+- [x] **Layouts:** Revisar `welcome.blade.php` y `layouts/app.blade.php` (IMPORTANTE: `app.blade.php` define estilos globales, tener cuidado al mover).
 
 ### Fase 2: Reducción del Monolito (BattleController) - Parte 1
 *Objetivo: Extraer lógica auxiliar sin romper el flujo principal.*

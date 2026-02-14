@@ -1,0 +1,716 @@
+/* Battle Setup & Selection Styles */
+
+/* --- Select Mode --- */
+.battle-header-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+}
+
+.battle-title {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    color: #fff;
+    letter-spacing: 3px;
+    text-shadow: 0 0 20px rgba(204, 0, 0, 0.3);
+}
+
+.battle-subtitle {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #888;
+}
+
+/* Mode Cards */
+.mode-card {
+    position: relative;
+    background: #1e2028;
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 30px 24px;
+    text-align: center;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.mode-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.mode-card-glow {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+}
+
+.mode-card:hover .mode-card-glow {
+    opacity: 1;
+}
+
+.glow-blue {
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
+}
+
+.glow-red {
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.08) 0%, transparent 50%);
+}
+
+.glow-yellow {
+    background: radial-gradient(circle, rgba(251, 191, 36, 0.08) 0%, transparent 50%);
+}
+
+.mode-icon {
+    font-size: 56px;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 2;
+}
+
+.mode-title {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: 2px;
+    color: #fff;
+    margin-bottom: 10px;
+    position: relative;
+    z-index: 2;
+}
+
+.mode-desc {
+    color: #888;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 2;
+}
+
+.mode-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 2;
+}
+
+.mode-tag {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.tag-easy {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22C55E;
+}
+
+.tag-medium {
+    background: rgba(251, 191, 36, 0.15);
+    color: #FBBF24;
+}
+
+.tag-hard {
+    background: rgba(239, 68, 68, 0.15);
+    color: #EF4444;
+}
+
+.tag-local {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3B82F6;
+}
+
+.tag-hotseat {
+    background: rgba(168, 85, 247, 0.15);
+    color: #A855F7;
+}
+
+.tag-random {
+    background: rgba(251, 191, 36, 0.15);
+    color: #FBBF24;
+}
+
+.tag-fast {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22C55E;
+}
+
+.mode-btn {
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+}
+
+/* Team Status Card (Select Mode) */
+.team-status-card {
+    background: #1e2028;
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.team-status-inner {
+    padding: 20px 24px;
+}
+
+.team-pokeballs-display {
+    display: flex;
+    gap: 6px;
+}
+
+.status-pokeball {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(to bottom, #555 50%, #444 50%);
+    border: 2px solid #333;
+    position: relative;
+    opacity: 0.3;
+    transition: all 0.3s;
+}
+
+.status-pokeball::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #444;
+    border: 1.5px solid #333;
+}
+
+.status-pokeball.filled {
+    background: linear-gradient(to bottom, #ff0000 50%, #fff 50%);
+    border-color: #333;
+    opacity: 1;
+}
+
+.status-pokeball.filled::after {
+    background: #fff;
+}
+
+.team-status-label {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 900;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    color: #888;
+    display: block;
+}
+
+.team-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 14px;
+    color: #fff;
+}
+
+
+/* --- Setup Pages (Shared) --- */
+.back-link {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #888;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.back-link:hover {
+    color: var(--silph-cyan);
+}
+
+.setup-title {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 800;
+    font-size: 26px;
+    color: #fff;
+    letter-spacing: 3px;
+}
+
+.setup-subtitle {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #888;
+}
+
+.config-panel {
+    background: #1e2028;
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    height: 100%;
+    /* Keep height 100% for alignment in rows */
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.06);
+}
+
+.panel-icon {
+    font-size: 22px;
+}
+
+.panel-title {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 900;
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: #fff;
+}
+
+.config-section {
+    margin-bottom: 20px;
+}
+
+.config-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 900;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.config-hint {
+    font-size: 11px;
+    color: #555;
+    display: block;
+    margin-top: 4px;
+}
+
+.config-select {
+    width: 100%;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+}
+
+.start-battle-btn {
+    font-size: 16px !important;
+    padding: 14px 30px 14px 55px !important;
+}
+
+/* Level Slider */
+.level-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.config-range {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    height: 8px;
+    outline: none;
+}
+
+.config-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(to bottom, #ff0000 50%, #fff 50%);
+    border: 2px solid #333;
+    cursor: pointer;
+}
+
+.level-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    background: var(--silph-cyan);
+    color: #000;
+    padding: 4px 12px;
+    border-radius: 6px;
+    min-width: 55px;
+    text-align: center;
+}
+
+
+/* --- Setup AI Specifics --- */
+.difficulty-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 2px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.difficulty-option:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.difficulty-option.selected {
+    border-color: var(--silph-cyan);
+    background: rgba(0, 242, 255, 0.05);
+}
+
+.difficulty-option input {
+    display: none;
+}
+
+.diff-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.diff-easy {
+    background: #22C55E;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+.diff-normal {
+    background: #FBBF24;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+}
+
+.diff-hard {
+    background: #EF4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.diff-name {
+    font-weight: 700;
+    font-size: 13px;
+    color: #fff;
+    display: block;
+}
+
+.diff-desc {
+    font-size: 11px;
+    color: #666;
+}
+
+/* Items Grid */
+.item-counter {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #aaa;
+}
+
+.items-grid-setup {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.item-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.item-option:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.item-option input {
+    display: none;
+}
+
+.item-option input:checked~.item-check-mark {
+    display: flex;
+}
+
+.item-option input:checked~.item-details .item-name-text {
+    color: var(--silph-cyan);
+}
+
+.item-img {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+.item-details {
+    flex: 1;
+}
+
+.item-name-text {
+    font-weight: 700;
+    font-size: 12px;
+    color: #fff;
+    display: block;
+    transition: color 0.2s;
+}
+
+.item-desc-text {
+    font-size: 10px;
+    color: #666;
+    display: block;
+}
+
+.item-check-mark {
+    display: none;
+    width: 22px;
+    height: 22px;
+    background: var(--silph-cyan);
+    color: #000;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 900;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Team Preview in Setup */
+.team-pkmn-card {
+    background: rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.team-pkmn-card.active-member {
+    border-color: rgba(34, 197, 94, 0.4);
+}
+
+.team-pkmn-card:hover {
+    transform: translateY(-4px);
+}
+
+.pkmn-card-img img {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.pkmn-card-name {
+    display: block;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #fff;
+}
+
+.pkmn-card-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #666;
+}
+
+.pkmn-card-types {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin: 6px 0;
+}
+
+.pkmn-type-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+.pkmn-card-stats {
+    font-size: 10px;
+    color: #888;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.selection-notice {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #8BB8F6;
+}
+
+.empty-team-msg {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+
+/* --- Multiplayer Setup Specifics --- */
+.info-notice {
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #8BB8F6;
+}
+
+.p2-mode-selector {
+    display: flex;
+    gap: 8px;
+}
+
+.p2-mode-option {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.p2-mode-option:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.p2-mode-option.selected {
+    border-color: var(--silph-cyan);
+    background: rgba(0, 242, 255, 0.05);
+}
+
+.p2-mode-option input {
+    display: none;
+}
+
+.p2-mode-icon {
+    font-size: 28px;
+}
+
+.p2-mode-text {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: #aaa;
+}
+
+.p2-mode-option.selected .p2-mode-text {
+    color: #fff;
+}
+
+/* P2 Search */
+.pokemon-search-container {
+    position: relative;
+}
+
+.pokemon-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #2a2d34;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    display: none;
+}
+
+.pokemon-search-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+}
+
+.pokemon-search-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.pokemon-search-item img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+}
+
+.p2-search-input {
+    width: 100%;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 12px;
+}
+
+.p2-search-label {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 4px;
+    display: block;
+}
