@@ -37,10 +37,6 @@ Para evitar romper el proyecto ("muerte por actualización masiva"), abordaremos
 
 Estas requieren una planificación dedicada y tests exhaustivos antes de empezar.
 
-1.  **Migración de Sesión a Base de Datos:**
-    -   *Estado:* El estado de batalla vive en `session('current_battle')`.
-    -   *Plan:* Crear modelos `Battle` y `BattleTurn` para persistir el estado. Esto permitirá reconexión y APIs reales.
-
-2.  **Refactorización de `PokemonHelper` a Servicios:**
+1.  **Refactorización de `PokemonHelper` a Servicios:**
     -   *Estado:* La clase hace demasiadas cosas (API, DB, Lógica).
     -   *Plan:* Dividir en `PokemonRepository` (DB), `PokeApiService` (Externa) y `BattleCalculator` (Lógica).
