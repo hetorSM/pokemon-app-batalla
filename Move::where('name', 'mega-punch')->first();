@@ -1,0 +1,13 @@
+[90m= [39m[
+    "[34mname[39m" => "[32mmega-punch[39m",
+    "[34mname_es[39m" => "[32mMegapuño[39m",
+    "[34mpower[39m" => [35m80[39m,
+    "[34maccuracy[39m" => [35m85[39m,
+    "[34mpp[39m" => [35m20[39m,
+    "[34mtype[39m" => "[32mnormal[39m",
+    "[34mdamage_class[39m" => "[32mphysical[39m",
+    "[34mpriority[39m" => [35m0[39m,
+    "[34mstatus_effect[39m" => [36mnull[39m,
+    "[34mstatus_chance[39m" => [35m0[39m,
+  ]
+

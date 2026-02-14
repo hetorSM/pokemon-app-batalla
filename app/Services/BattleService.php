@@ -200,7 +200,7 @@ class BattleService
                 $pokemon['battle_stats'] = $battleStats;
                 $pokemon['current_hp'] = $battleStats['hp'];
                 $pokemon['max_hp'] = $battleStats['hp'];
-                $pokemon['moves'] = PokemonHelper::selectBattleMoves($randomId);
+                $pokemon['moves'] = PokemonHelper::selectBattleMoves($randomId, 4, $level);
                 $pokemon['status'] = null;
                 $pokemon['status_turns'] = 0;
                 $pokemon['stat_stages'] = [
@@ -224,7 +224,7 @@ class BattleService
         $pokemon['battle_stats'] = $battleStats;
         $pokemon['current_hp'] = $battleStats['hp'];
         $pokemon['max_hp'] = $battleStats['hp'];
-        $pokemon['moves'] = PokemonHelper::selectBattleMoves($pokemon['id']);
+        $pokemon['moves'] = PokemonHelper::selectBattleMoves($pokemon['id'], 4, $level);
         $pokemon['status'] = null;
         $pokemon['status_turns'] = 0;
         $pokemon['stat_stages'] = [

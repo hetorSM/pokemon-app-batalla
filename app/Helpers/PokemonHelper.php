@@ -9,132 +9,176 @@ class PokemonHelper
 {
     public static function getPokemon($id)
     {
-        // 0. Check internal memory/cache first
-        $cacheKey = "pokemon_{$id}";
+        // 0. Check internal memory/cache first (Laravel Cache)
+        $cacheKey = "pokemon_{$id}_full_v2";
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached;
         }
 
-        // 1. Check DB Persistence
-        try {
-            $pokemonModel = \App\Models\Pokemon::where('api_id', $id)->first();
-            if ($pokemonModel) {
-                $data = [
-                    'id' => $pokemonModel->api_id,
-                    'name' => ucfirst($pokemonModel->name),
-                    'image' => $pokemonModel->sprites['other']['official-artwork']['front_default'] ?? $pokemonModel->sprites['front_default'],
-                    'types' => $pokemonModel->types,
-                    'stats' => $pokemonModel->stats,
-                    'move_names' => $pokemonModel->move_list,
-                    'cries' => $pokemonModel->cries,
-                    'evolutions' => [], // Evolution chain is complex, we might still fetch it or store it differently. For now, let's keep it simple or re-fetch if needed.
-                ];
-                // Note: Evolutions are currently fetched via API in the original code. 
-                // To fully persist, we'd need to store evolutions too. 
-                // For now, let's fetch evolutions if not stored, OR just re-fetch species data lightly.
-                // Re-implementing full evolution persistence would require a separate table or complex JSON. 
-                // Let's stick to the main request: Stats & Moves. 
-                // We will re-fetch species data for evolutions to keep compatibility with existing views, 
-                // BUT we won't re-fetch the main pokemon data.
+        // 1. Check DB Persistence (Normalized)
+        $pokemonModel = \App\Models\Pokemon::with(['types', 'stats', 'moves', 'sprite', 'cry'])
+            ->where('api_id', $id)
+            ->first();
 
-                // ... actually, to keep it fast, let's try to cache the evolutions too if possible, OR just accept a small hit for evolutions.
-                // Let's re-use the existing logic for evolutions but skip the main pokemon fetch.
-
-                $client = new Client();
-                try {
-                    // We still need the species URL to get evolutions if we haven't stored them.
-                    // For this iteration, let's just re-fetch the species/evolution part to ensure the UI doesn't break.
-                    // Improving evolution persistence can be a next step.
-                    $response = $client->get("https://pokeapi.co/api/v2/pokemon/{$id}");
-                    $apiData = json_decode($response->getBody(), true);
-
-                    $speciesResponse = $client->get($apiData['species']['url']);
-                    $speciesData = json_decode($speciesResponse->getBody(), true);
-                    $evoResponse = $client->get($speciesData['evolution_chain']['url']);
-                    $evoData = json_decode($evoResponse->getBody(), true);
-                    $data['evolutions'] = self::parseEvolutionChain($evoData['chain']);
-                }
-                catch (\Exception $e) {
-                    $data['evolutions'] = [];
-                }
-
-                Cache::put($cacheKey, $data, 3600);
-                return $data;
-            }
-        }
-        catch (\Exception $e) {
-        // DB Error, proceed to API
+        if ($pokemonModel) {
+            $data = self::formatPokemonModel($pokemonModel);
+            Cache::put($cacheKey, $data, 3600);
+            return $data;
         }
 
-        $client = new Client();
+        // 2. Fetch from API if not in DB
+        $client = new \GuzzleHttp\Client();
 
         try {
             $response = $client->get("https://pokeapi.co/api/v2/pokemon/{$id}");
             $data = json_decode($response->getBody(), true);
 
-            // Obtener datos de la especie para la cadena de evolución
-            $speciesResponse = $client->get($data['species']['url']);
-            $speciesData = json_decode($speciesResponse->getBody(), true);
-
-            $evoResponse = $client->get($speciesData['evolution_chain']['url']);
-            $evoData = json_decode($evoResponse->getBody(), true);
-
-            $evolutions = self::parseEvolutionChain($evoData['chain']);
-
-            $types = array_map(function ($type) {
-                return $type['type']['name'];
-            }, $data['types']);
-
-            $stats = [
-                'hp' => $data['stats'][0]['base_stat'],
-                'attack' => $data['stats'][1]['base_stat'],
-                'defense' => $data['stats'][2]['base_stat'],
-                'special-attack' => $data['stats'][3]['base_stat'],
-                'special-defense' => $data['stats'][4]['base_stat'],
-                'speed' => $data['stats'][5]['base_stat'],
-            ];
-
-            $moveNames = array_map(function ($m) {
-                return $m['move']['name'];
-            }, $data['moves']);
-
-            $result = [
-                'id' => $data['id'],
-                'name' => ucfirst($data['name']),
-                'image' => $data['sprites']['other']['official-artwork']['front_default']
-                ?? $data['sprites']['front_default']
-                ?? "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{$id}.png",
-                'types' => $types,
-                'stats' => $stats,
-                'move_names' => $moveNames,
-                'cries' => $data['cries'] ?? null,
-                'evolutions' => $evolutions,
-            ];
-
-            // Save to DB for persistence
-            try {
-                \App\Models\Pokemon::updateOrCreate(
+            // DB Transaction to ensure data integrity
+            $pokemonModel = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $id) {
+                // A. Create/Update Pokemon Base
+                $pokemon = \App\Models\Pokemon::updateOrCreate(
                 ['api_id' => $data['id']],
                 [
                     'name' => $data['name'],
-                    'sprites' => $data['sprites'],
-                    'types' => $types,
-                    'stats' => $stats,
-                    'move_list' => $moveNames,
-                    'cries' => $data['cries'] ?? null,
+                    'base_experience' => $data['base_experience'],
+                    'height' => $data['height'],
+                    'weight' => $data['weight'],
                 ]
                 );
-            }
-            catch (\Exception $e) {
-            // Ignore DB error
-            }
 
-            Cache::put($cacheKey, $result, 3600);
-            return $result;
+                // B. Types
+                $pokemon->types()->detach();
+                foreach ($data['types'] as $t) {
+                    $type = \App\Models\Type::firstOrCreate(['name' => $t['type']['name']]);
+                    $pokemon->types()->attach($type->id, ['slot' => $t['slot']]);
+                }
+
+                // C. Stats
+                $pokemon->stats()->detach();
+                foreach ($data['stats'] as $s) {
+                    $stat = \App\Models\Stat::firstOrCreate(['name' => $s['stat']['name']]);
+                    $pokemon->stats()->attach($stat->id, ['base_value' => $s['base_stat']]);
+                }
+
+                // D. Sprites
+                \App\Models\PokemonSprite::updateOrCreate(
+                ['pokemon_id' => $pokemon->id],
+                [
+                    'front_default' => $data['sprites']['front_default'],
+                    'official_artwork' => $data['sprites']['other']['official-artwork']['front_default'] ?? null,
+                    'front_shiny' => $data['sprites']['front_shiny'],
+                    'back_default' => $data['sprites']['back_default'],
+                ]
+                );
+
+                // E. Cries (if available in API response, otherwise skipped)
+                if (isset($data['cries'])) {
+                    \App\Models\PokemonCry::updateOrCreate(
+                    ['pokemon_id' => $pokemon->id],
+                    [
+                        'latest' => $data['cries']['latest'] ?? null,
+                        'legacy' => $data['cries']['legacy'] ?? null,
+                    ]
+                    );
+                }
+
+                // F. Moves (Heavy operation)
+                // Filter for a specific version group to avoid clutter. 
+                // Let's use 'scarlet-violet' -> 'sword-shield' -> 'ultra-sun-ultra-moon' -> generic
+                // Actually, storing ALL valid moves is better but duplicate names exist.
+                // We will iterate and prioritize the LATEST learn method/level for each move.
+
+                $movesToAttach = [];
+                foreach ($data['moves'] as $m) {
+                    $moveName = $m['move']['name'];
+
+                    // Allow simple move creation if it doesn't exist (details fetched later)
+                    $moveDB = \App\Models\Move::firstOrCreate(['name' => $moveName]);
+
+                    // Find level-up data
+                    $level = 0;
+                    $method = 'machine'; // Default fallback
+
+                    // Search for level-up in latest versions
+                    foreach ($m['version_group_details'] as $vgd) {
+                        if ($vgd['move_learn_method']['name'] === 'level-up') {
+                            $level = $vgd['level_learned_at'];
+                            $method = 'level-up';
+                            break; // Take the first level-up found (usually earliest/latest depending on sort, API order varies)
+                        }
+                    }
+
+                    // If not level-up, take the first available method data
+                    if ($method !== 'level-up' && !empty($m['version_group_details'])) {
+                        $vgd = $m['version_group_details'][0];
+                        $level = $vgd['level_learned_at'];
+                        $method = $vgd['move_learn_method']['name'];
+                    }
+
+                    $movesToAttach[$moveDB->id] = [
+                        'level_learned_at' => $level,
+                        'learn_method' => $method
+                    ];
+                }
+                $pokemon->moves()->sync($movesToAttach);
+
+                return $pokemon;
+            });
+
+            // Reload to get relations
+            $pokemonModel->load(['types', 'stats', 'moves', 'sprite', 'cry']);
+            $formatted = self::formatPokemonModel($pokemonModel);
+
+            // Add Evolutions (This part remains API-dependent for now to save time, or we can persist species too)
+            // For now, fetch lively as before to avoid complex species tables
+            $formatted['evolutions'] = self::fetchEvolutions($id, $client);
+
+            Cache::put($cacheKey, $formatted, 3600);
+            return $formatted;
+
         }
         catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Error fetching Pokemon {$id}: " . $e->getMessage());
             return null;
+        }
+    }
+
+    private static function formatPokemonModel($pokemon)
+    {
+        return [
+            'id' => $pokemon->api_id,
+            'name' => ucfirst($pokemon->name),
+            'image' => $pokemon->sprite->official_artwork ?? $pokemon->sprite->front_default ?? "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{$pokemon->api_id}.png",
+            'types' => $pokemon->types->pluck('name')->toArray(),
+            'stats' => $pokemon->stats->mapWithKeys(fn($s) => [$s->name => $s->pivot->base_value])->toArray(),
+            'move_names' => $pokemon->moves->pluck('name')->toArray(), // Backward compatibility
+            'moves_detailed' => $pokemon->moves->map(fn($m) => [
+            'name' => $m->name,
+            'level' => $m->pivot->level_learned_at,
+            'method' => $m->pivot->learn_method
+            ])->sortBy('level')->values()->toArray(),
+            'cries' => $pokemon->cry ? ['latest' => $pokemon->cry->latest, 'legacy' => $pokemon->cry->legacy] : [],
+            'evolutions' => [], // Filled separately if needed or cached
+            'base_experience' => $pokemon->base_experience,
+            'height' => $pokemon->height,
+            'weight' => $pokemon->weight,
+        ];
+    }
+
+    private static function fetchEvolutions($id, $client)
+    {
+        try {
+            $response = $client->get("https://pokeapi.co/api/v2/pokemon/{$id}");
+            $apiData = json_decode($response->getBody(), true);
+            $speciesResponse = $client->get($apiData['species']['url']);
+            $speciesData = json_decode($speciesResponse->getBody(), true);
+            $evoResponse = $client->get($speciesData['evolution_chain']['url']);
+            $evoData = json_decode($evoResponse->getBody(), true);
+            return self::parseEvolutionChain($evoData['chain']);
+        }
+        catch (\Exception $e) {
+            return [];
         }
     }
 
@@ -217,7 +261,7 @@ class PokemonHelper
         }
     }
 
-    public static function selectBattleMoves($pokemonId, $count = 4)
+    public static function selectBattleMoves($pokemonId, $count = 4, $level = 50)
     {
         $pokemon = self::getPokemon($pokemonId);
         if (!$pokemon || empty($pokemon['move_names'])) {
@@ -225,20 +269,49 @@ class PokemonHelper
         }
 
         $pokemonTypes = $pokemon['types'] ?? ['normal'];
-        $allMoveNames = $pokemon['move_names'];
+
+        // Use detailed moves if available (from new logic)
+        $candidates = [];
+        if (!empty($pokemon['moves_detailed'])) {
+            foreach ($pokemon['moves_detailed'] as $m) {
+                // Logic: Allow moves learned by level up <= current level
+                if ($m['method'] === 'level-up' && $m['level'] <= $level) {
+                    $candidates[] = $m['name'];
+                }
+                // Allow other methods (machine, tutor, egg) indiscriminately? 
+                // Creating a competitive set usually implies access to TMs. 
+                // Let's allow them but maybe deprioritize if we want "natural" feel.
+                // For now: Allow all non-level-up moves (assumed TMs/Tutors available)
+                elseif ($m['method'] !== 'level-up') {
+                    $candidates[] = $m['name'];
+                }
+            }
+        }
+        else {
+            // Fallback for old data or failures
+            $candidates = $pokemon['move_names'];
+        }
+
+        // Deduplicate
+        $candidates = array_unique($candidates);
 
         $stabMoves = [];
         $coverageMoves = [];
 
-        foreach ($allMoveNames as $moveName) {
-            // Updated logic: Try DB -> API -> Fallback
-            $moveData = self::getOrFetchMove($moveName);
+        foreach ($candidates as $moveName) {
+            $moveData = self::getOrFetchMove($moveName); // This fetches stats (Type, Power)
 
-            // If still null (API failed and not in emergency DB), skip
-            if (!$moveData)
-                continue;
+            if (!$moveData || ($moveData['power'] ?? 0) <= 0 && ($moveData['damage_class'] ?? 'physical') !== 'status')
+                continue; // Skip useless moves or purely weak ones? No, keep status moves.
 
-            $score = $moveData['power'];
+            // Score calculation
+            $score = $moveData['power'] ?? 0;
+
+            // Boost Status moves priority slightly so they aren't always discarded if power is 0
+            if (($moveData['damage_class'] ?? 'physical') === 'status') {
+                $score = 40; // Equivalent to a weak attack
+            }
+
             $isStab = in_array($moveData['type'], $pokemonTypes);
             if ($isStab) {
                 $score *= 1.5;
@@ -246,6 +319,12 @@ class PokemonHelper
             if (($moveData['accuracy'] ?? 100) >= 90) {
                 $score *= 1.1;
             }
+
+            // Penalize moves with low PP
+            if (($moveData['pp'] ?? 35) < 5) {
+                $score *= 0.8;
+            }
+
             $moveData['score'] = $score;
             $moveData['is_stab'] = $isStab;
 
@@ -291,6 +370,15 @@ class PokemonHelper
             }
         }
 
+        // If still lacking, add remaining STAB
+        foreach ($stabMoves as $move) {
+            if (count($selected) >= $count)
+                break;
+            if (!in_array($move['name'], array_column($selected, 'name'))) {
+                $selected[] = $move;
+            }
+        }
+
         // Fill remaining with type defaults (no API calls)
         if (count($selected) < $count) {
             $defaults = self::getDefaultMoves($pokemonTypes);
@@ -305,7 +393,7 @@ class PokemonHelper
 
         // Safety net
         while (count($selected) < $count) {
-            $selected[] = MoveDatabase::getMove('tackle');
+            $selected[] = \App\Models\Move::where('name', 'tackle')->first()->toBattleArray() ?? MoveDatabase::getMove('tackle');
         }
 
         return array_map(function ($move) {
@@ -562,7 +650,11 @@ class PokemonHelper
         // 1. Check in MySQL Database
         try {
             $moveModel = \App\Models\Move::where('name', $moveName)->first();
-            if ($moveModel) {
+
+            // Check if model exists AND has sufficient data.
+            // We use 'name_es' as a flag because it's populated from API but null by default in migration.
+            // If name_es is present, we assume the move details were fetched.
+            if ($moveModel && !empty($moveModel->name_es)) {
                 return $moveModel->toBattleArray();
             }
         }
@@ -573,11 +665,12 @@ class PokemonHelper
         // 2. Fetch from PokéAPI
         $apiData = self::getMoveDetails($moveName);
         if ($apiData) {
-            // 3. Save to MySQL
+            // 3. Save to MySQL (Update if exists, Create if not)
             try {
-                \App\Models\Move::create([
-                    'name' => $apiData['name'],
-                    'name_es' => $apiData['name_es'],
+                \App\Models\Move::updateOrCreate(
+                ['name' => $moveName],
+                [
+                    'name_es' => $apiData['name_es'] ?? ucfirst(str_replace('-', ' ', $moveName)),
                     'power' => $apiData['power'],
                     'accuracy' => $apiData['accuracy'],
                     'pp' => $apiData['pp'],
@@ -586,7 +679,8 @@ class PokemonHelper
                     'status_effect' => $apiData['status_effect'],
                     'status_chance' => $apiData['status_chance'],
                     'priority' => $apiData['priority'],
-                ]);
+                ]
+                );
             }
             catch (\Exception $e) {
             // Ignore DB errors, just return data
@@ -595,6 +689,11 @@ class PokemonHelper
         }
 
         // 4. Emergency Fallback
+        if ($moveModel) {
+            // Even if incomplete, better than nothing if API failed
+            return $moveModel->toBattleArray();
+        }
+
         return MoveDatabase::getMove($moveName);
     }
 }

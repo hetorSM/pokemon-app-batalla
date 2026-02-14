@@ -181,22 +181,91 @@
                         </div>
                     </div>
 
-                    <div class="silph-moves-grid">
-                        @php
-                        // We only have names initially. Check DB simply for presence to color code?
-                        // For performance, we assume all are "Pending" details unless we query simply.
-                        // Let's just list them and let JS fill the gaps.
-                        @endphp
-                        @foreach($pokemon['move_names'] as $moveName)
-                        <div class="silph-move-chip" data-move-name="{{ $moveName }}">
-                            <div class="move-name">{{ ucfirst(str_replace('-', ' ', $moveName)) }}</div>
-                            <div class="move-meta">
-                                <span class="move-type" id="type-{{ $moveName }}">---</span>
-                                <span class="move-power" id="power-{{ $moveName }}">PWR: --</span>
+                    @php
+                    $levelMoves = [];
+                    $techMoves = [];
+
+                    if (!empty($pokemon['moves_detailed'])) {
+                    foreach($pokemon['moves_detailed'] as $move) {
+                    if ($move['method'] === 'level-up') {
+                    $levelMoves[] = $move;
+                    } else {
+                    $techMoves[] = $move;
+                    }
+                    }
+                    } else {
+                    // Fallback for old data: Treat all as tech/unknown
+                    foreach($pokemon['move_names'] ?? [] as $name) {
+                    $techMoves[] = ['name' => $name, 'level' => 0, 'method' => 'unknown'];
+                    }
+                    }
+
+                    // Sort tech moves alphabetically
+                    usort($techMoves, fn($a, $b) => strcmp($a['name'], $b['name']));
+                    @endphp
+
+                    <div class="row">
+                        <!-- Level Up Moves -->
+                        <div class="col-lg-6 mb-4">
+                            <h6 class="text-muted mb-3 font-weight-bold" style="font-family: var(--mont-bold);">
+                                NATURAL_LEARNING_SET</h6>
+                            <div class="silph-move-table-wrapper">
+                                <table class="table table-borderless silph-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center" style="width: 50px;">LVL</th>
+                                            <th>MOVE_NAME</th>
+                                            <th>TYPE</th>
+                                            <th class="text-end">PWR</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($levelMoves as $move)
+                                        <tr class="silph-move-row" data-move-name="{{ $move['name'] }}">
+                                            <td class="text-center text-cyan fw-bold">{{ $move['level'] }}</td>
+                                            <td class="fw-bold">{{ ucfirst(str_replace('-', ' ', $move['name'])) }}</td>
+                                            <td id="type-{{ $move['name'] }}" class="small-type">...</td>
+                                            <td id="power-{{ $move['name'] }}" class="text-end small-pwr">--</td>
+                                        </tr>
+                                        @endforeach
+                                        @if(empty($levelMoves))
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted">No natural moves data.</td>
+                                        </tr>
+                                        @endif
+                                    </tbody>
+                                </table>
                             </div>
-                            <div class="move-load-bar"></div>
                         </div>
-                        @endforeach
+
+                        <!-- Technical Moves -->
+                        <div class="col-lg-6 mb-4">
+                            <h6 class="text-muted mb-3 font-weight-bold" style="font-family: var(--mont-bold);">
+                                TECHNICAL_&_ASTRAL_SET</h6>
+                            <div class="silph-move-table-wrapper">
+                                <table class="table table-borderless silph-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center" style="width: 50px;">SRC</th>
+                                            <th>MOVE_NAME</th>
+                                            <th>TYPE</th>
+                                            <th class="text-end">PWR</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($techMoves as $move)
+                                        <tr class="silph-move-row" data-move-name="{{ $move['name'] }}">
+                                            <td class="text-center text-muted small"><i class="fas fa-compact-disc"></i>
+                                            </td>
+                                            <td class="fw-bold">{{ ucfirst(str_replace('-', ' ', $move['name'])) }}</td>
+                                            <td id="type-{{ $move['name'] }}" class="small-type">...</td>
+                                            <td id="power-{{ $move['name'] }}" class="text-end small-pwr">--</td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -594,81 +663,66 @@
     }
 
     /* Moves Grid */
-    .silph-moves-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 10px;
-        max-height: 400px;
+    .silph-move-table-wrapper {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        max-height: 500px;
         overflow-y: auto;
-        padding-right: 5px;
+        padding: 5px;
     }
 
-    .silph-move-chip {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 8px 12px;
-        border-radius: 4px;
-        position: relative;
-        overflow: hidden;
-        transition: all 0.2s;
-    }
-
-    .silph-move-chip:hover {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: rgba(255, 255, 255, 0.3);
-    }
-
-    .silph-move-chip.loaded {
-        border-right: 3px solid var(--type-color, #777);
-    }
-
-    .move-name {
-        font-family: var(--mont-bold);
-        font-size: 11px;
-        font-weight: 800;
-        margin-bottom: 4px;
+    .silph-table {
+        margin-bottom: 0;
         color: #ddd;
+        font-size: 12px;
     }
 
-    .move-meta {
-        font-size: 9px;
+    .silph-table thead th {
+        background: rgba(255, 255, 255, 0.03);
         color: #888;
-        display: flex;
-        justify-content: space-between;
+        font-family: var(--mont-bold);
+        font-size: 10px;
+        letter-spacing: 1px;
+        padding: 10px;
     }
 
-    .move-load-bar {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        height: 2px;
-        width: 100%;
-        background: rgba(0, 242, 255, 0.3);
-        transform: scaleX(0);
-        transform-origin: left;
-        transition: transform 0.3s;
+    .silph-table tbody tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+        transition: background 0.2s;
     }
 
-    .silph-move-chip.loading .move-load-bar {
-        animation: load-pulse 1s infinite;
+    .silph-table tbody tr:hover {
+        background: rgba(0, 242, 255, 0.05);
     }
 
-    @keyframes load-pulse {
-        0% {
-            transform: scaleX(0);
-            opacity: 1;
-        }
+    .silph-table td {
+        vertical-align: middle;
+        padding: 8px 10px;
+    }
 
-        50% {
-            transform: scaleX(1);
-            opacity: 0.5;
-        }
+    .small-type {
+        font-family: var(--mont-bold);
+        font-size: 9px;
+        opacity: 0.8;
+    }
 
-        100% {
-            transform: scaleX(0);
-            opacity: 0;
-            transform-origin: right;
-        }
+    .silph-move-row.loaded .small-type {
+        opacity: 1;
+    }
+
+    /* Scrollbar */
+    .silph-move-table-wrapper::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .silph-move-table-wrapper::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .silph-move-table-wrapper::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
     }
 </style>
 @endpush
@@ -715,25 +769,27 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
-        // ... existing code ...
 
-        const moveChips = document.querySelectorAll('.silph-move-chip');
+        const moveRows = document.querySelectorAll('.silph-move-row');
         const loader = document.getElementById('moves-loading-indicator');
 
         // We will fetch moves in batches to be efficient
         const movesToFetch = [];
-        moveChips.forEach(chip => {
-            movesToFetch.push(chip.getAttribute('data-move-name'));
+        moveRows.forEach(row => {
+            movesToFetch.push(row.getAttribute('data-move-name'));
         });
 
-        if (movesToFetch.length > 0) {
+        // Deduplicate
+        const uniqueMoves = [...new Set(movesToFetch)];
+
+        if (uniqueMoves.length > 0) {
             loader.classList.remove('d-none');
-            fetchMovesBatch(movesToFetch);
+            fetchMovesBatch(uniqueMoves);
         }
 
         async function fetchMovesBatch(moves) {
-            // Chunking into batches of 10 to avoid URI too long or huge payloads
-            const chunkSize = 10;
+            // Chunking into batches of 20 - bit larger for tables
+            const chunkSize = 20;
             for (let i = 0; i < moves.length; i += chunkSize) {
                 const chunk = moves.slice(i, i + chunkSize);
                 try {
@@ -748,7 +804,7 @@
 
                     if (response.ok) {
                         const data = await response.json();
-                        updateMoveChips(data);
+                        updateMoveRows(data);
                     }
                 } catch (error) {
                     console.error("Failed to fetch moves chunk", error);
@@ -760,27 +816,35 @@
             loader.classList.add('d-none');
         }
 
-        function updateMoveChips(data) {
+        function updateMoveRows(data) {
             // data is keyed by move name
             for (const [name, moveData] of Object.entries(data)) {
                 if (!moveData) continue;
 
-                const chip = document.querySelector(`.silph-move-chip[data-move-name="${name}"]`);
-                if (chip) {
-                    chip.classList.add('loaded');
-                    chip.style.setProperty('--type-color', TYPE_COLORS[moveData.type] || '#777');
+                // Find ALL rows with this move name (duplicates allowed in UI if needed, but here likely unique per table)
+                const rows = document.querySelectorAll(`.silph-move-row[data-move-name="${name}"]`);
 
-                    const typeEl = document.getElementById(`type-${name}`);
-                    const powerEl = document.getElementById(`power-${name}`);
+                rows.forEach(row => {
+                    row.classList.add('loaded');
+                    // Find cells using querySelector relative to row would be safer if IDs weren't used.
+                    // But we used IDs "type-{name}" which is problematic if move appears twice (e.g. in both tables? No, split by method).
+                    // Actually, IDs must be unique. If a move is both level up and TM, we might have duplicate IDs.
+                    // Let's rely on scoping within the row for cleaner DOM.
+                    // But the blade template generated IDs. 
+                    // Let's select properly.
 
-                    if (typeEl) {
-                        typeEl.textContent = moveData.type.toUpperCase();
-                        typeEl.style.color = TYPE_COLORS[moveData.type] || '#888';
+                    const typeSpan = row.querySelector('[id^="type-"]');
+                    const powerSpan = row.querySelector('[id^="power-"]');
+
+                    if (typeSpan) {
+                        typeSpan.textContent = moveData.type.toUpperCase();
+                        typeSpan.style.color = TYPE_COLORS[moveData.type] || '#888';
+                        typeSpan.style.fontWeight = 'bold';
                     }
-                    if (powerEl) {
-                        powerEl.textContent = moveData.power ? `PWR: ${moveData.power}` : 'STATUS';
+                    if (powerSpan) {
+                        powerSpan.textContent = moveData.power > 0 ? moveData.power : '-';
                     }
-                }
+                });
             }
         }
     });

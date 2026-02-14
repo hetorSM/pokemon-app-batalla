@@ -22,6 +22,13 @@ class Move extends Model
         'priority',
     ];
 
+    public function pokemons()
+    {
+        return $this->belongsToMany(Pokemon::class , 'pokemon_moves')
+            ->withPivot('level_learned_at', 'learn_method')
+            ->withTimestamps();
+    }
+
     /**
      * Get the formatted Move Array for the battle system.
      */
