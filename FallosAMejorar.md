@@ -28,8 +28,8 @@ Para evitar romper el proyecto ("muerte por actualización masiva"), abordaremos
 
 ### Fase 3: Estandarización de `PokemonHelper`
 *Objetivo: Mejorar la robustez de las transacciones de base de datos.*
-- [ ] **Optimización de Transacciones:** Revisar `getPokemon` para asegurar que las transacciones DB no sean excesivamente largas, reduciendo riesgo de timeouts.
-- [ ] **Tipado Estricto (Gradual):** Añadir tipos de retorno (`: array`, `: ?object`) a los métodos auxiliares pequeños para detectar errores antes.
+- [x] **Optimización de Transacciones:** Revisar `getPokemon` para asegurar que las transacciones DB no sean excesivamente largas, reduciendo riesgo de timeouts.
+- [x] **Tipado Estricto (Gradual):** Añadir tipos de retorno (`: array`, `: ?object`) a los métodos auxiliares pequeños para detectar errores antes.
 
 ---
 

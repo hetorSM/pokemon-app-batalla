@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Helpers;
 
 use GuzzleHttp\Client;
@@ -8,7 +10,7 @@ use App\Models\Pokemon;
 
 class PokemonHelper
 {
-    public static function getPokemon($id)
+    public static function getPokemon(int|string $id): ?array
     {
         // 0. Verificar caché interna primero (Laravel Cache)
         $cacheKey = "pokemon_{$id}_full_v2";
@@ -33,7 +35,7 @@ class PokemonHelper
 
         try {
             $response = $client->get("https://pokeapi.co/api/v2/pokemon/{$id}");
-            $data = json_decode($response->getBody(), true);
+            $data = json_decode($response->getBody()->getContents(), true);
 
             // Transacción de BD para asegurar integridad de datos
             $pokemonModel = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $id) {
@@ -73,7 +75,7 @@ class PokemonHelper
                 ]
                 );
 
-                // E. Cries (if available in API response, otherwise skipped)
+                // E. Cries
                 if (isset($data['cries'])) {
                     \App\Models\PokemonCry::updateOrCreate(
                     ['pokemon_id' => $pokemon->id],
@@ -84,33 +86,49 @@ class PokemonHelper
                     );
                 }
 
-                // F. Moves (Heavy operation)
-                // Filter for a specific version group to avoid clutter. 
-                // Let's use 'scarlet-violet' -> 'sword-shield' -> 'ultra-sun-ultra-moon' -> generic
-                // Actually, storing ALL valid moves is better but duplicate names exist.
-                // We will iterate and prioritize the LATEST learn method/level for each move.
-
+                // F. Moves (Optimized Bulk Operation)
                 $movesToAttach = [];
+                // Extract all move names
+                $moveNames = array_map(fn($m) => $m['move']['name'], $data['moves']);
+
+                // Fetch existing moves
+                $existingMoves = \App\Models\Move::whereIn('name', $moveNames)->get()->keyBy('name');
+
+                // Identify missing moves
+                $missingMoves = [];
+                foreach ($moveNames as $name) {
+                    if (!$existingMoves->has($name)) {
+                        $missingMoves[] = ['name' => $name, 'created_at' => now(), 'updated_at' => now()];
+                    }
+                }
+
+                // Insert missing moves in bulk if any
+                if (!empty($missingMoves)) {
+                    \App\Models\Move::insert($missingMoves);
+                    // Fetch again to get IDs including valid ones
+                    $existingMoves = \App\Models\Move::whereIn('name', $moveNames)->get()->keyBy('name');
+                }
+
                 foreach ($data['moves'] as $m) {
                     $moveName = $m['move']['name'];
 
-                    // Allow simple move creation if it doesn't exist (details fetched later)
-                    $moveDB = \App\Models\Move::firstOrCreate(['name' => $moveName]);
+                    if (!$existingMoves->has($moveName))
+                        continue;
+
+                    $moveDB = $existingMoves->get($moveName);
 
                     // Find level-up data
                     $level = 0;
-                    $method = 'machine'; // Default fallback
+                    $method = 'machine';
 
-                    // Search for level-up in latest versions
                     foreach ($m['version_group_details'] as $vgd) {
                         if ($vgd['move_learn_method']['name'] === 'level-up') {
                             $level = $vgd['level_learned_at'];
                             $method = 'level-up';
-                            break; // Take the first level-up found (usually earliest/latest depending on sort, API order varies)
+                            break;
                         }
                     }
 
-                    // If not level-up, take the first available method data
                     if ($method !== 'level-up' && !empty($m['version_group_details'])) {
                         $vgd = $m['version_group_details'][0];
                         $level = $vgd['level_learned_at'];
@@ -131,8 +149,7 @@ class PokemonHelper
             $pokemonModel->load(['types', 'stats', 'moves', 'sprite', 'cry']);
             $formatted = self::formatPokemonModel($pokemonModel);
 
-            // Agregar Evoluciones (Esto sigue dependiendo de la API por ahora)
-            // Por ahora, buscar en vivo para evitar tablas de especies complejas
+            // Agregar Evoluciones
             $formatted['evolutions'] = self::fetchEvolutions($id, $client);
 
             Cache::put($cacheKey, $formatted, 3600);
@@ -174,11 +191,11 @@ class PokemonHelper
         try {
             // ... (API calls)
             $response = $client->get("https://pokeapi.co/api/v2/pokemon/{$id}");
-            $apiData = json_decode($response->getBody(), true);
+            $apiData = json_decode($response->getBody()->getContents(), true);
             $speciesResponse = $client->get($apiData['species']['url']);
-            $speciesData = json_decode($speciesResponse->getBody(), true);
+            $speciesData = json_decode($speciesResponse->getBody()->getContents(), true);
             $evoResponse = $client->get($speciesData['evolution_chain']['url']);
-            $evoData = json_decode($evoResponse->getBody(), true);
+            $evoData = json_decode($evoResponse->getBody()->getContents(), true);
             return self::parseEvolutionChain($evoData['chain']);
         }
         catch (\Exception $e) {
@@ -224,7 +241,7 @@ class PokemonHelper
 
         try {
             $response = $client->get("https://pokeapi.co/api/v2/move/{$moveName}");
-            $data = json_decode($response->getBody(), true);
+            $data = json_decode($response->getBody()->getContents(), true);
 
             $nameEs = $moveName;
             foreach ($data['names'] ?? [] as $nameEntry) {
@@ -485,7 +502,7 @@ class PokemonHelper
         $client = new Client();
         try {
             $response = $client->get("https://pokeapi.co/api/v2/pokemon?offset={$offset}&limit={$limit}");
-            $data = json_decode($response->getBody(), true);
+            $data = json_decode($response->getBody()->getContents(), true);
             $pokemons = [];
             foreach ($data['results'] as $pokemon) {
                 $urlParts = explode('/', rtrim($pokemon['url'], '/'));
@@ -576,7 +593,7 @@ class PokemonHelper
         $client = new Client();
         try {
             $response = $client->get("https://pokeapi.co/api/v2/pokemon?limit=2000");
-            $data = json_decode($response->getBody(), true);
+            $data = json_decode($response->getBody()->getContents(), true);
             $list = [];
             foreach ($data['results'] as $p) {
                 $parts = explode('/', rtrim($p['url'], '/'));
@@ -605,7 +622,7 @@ class PokemonHelper
         $client = new Client();
         try {
             $response = $client->get("https://pokeapi.co/api/v2/pokemon?limit={$limit}");
-            $data = json_decode($response->getBody(), true);
+            $data = json_decode($response->getBody()->getContents(), true);
             $list = [];
             foreach ($data['results'] as $p) {
                 $parts = explode('/', rtrim($p['url'], '/'));
