@@ -9,7 +9,7 @@ Este documento detalla los problemas encontrados en el código y sugerencias de 
 - [ ] **Duplicación de Código:** Lógica de preparación de equipos duplicada en `startMultiplayerBattle` y `startAIBattle`.
 
 ## 2. Frontend y UI
-- [ ] **Lógica en Vistas:** `arena.blade.php` contiene bloques `@php` con lógica de cálculo de porcentajes y estados. Esto debería pasarse desde el Controlador o un View Composer.
+- [x] **Lógica en Vistas:** `arena.blade.php` contiene bloques `@php` con lógica de cálculo de porcentajes y estados. Esto debería pasarse desde el Controlador o un View Composer.
 - [x] **CSS Embebido:** `arena.blade.php` tiene un bloque `<style>` de más de 300 líneas. Debería extraerse a un archivo CSS/SCSS dedicado o refactorizarse usando Tailwind CSS.
 - [ ] **Strings Hardcodeados:** Textos en la interfaz (Blade y JS) no están internacionalizados (i18n), dificultando la traducción.
 
@@ -35,19 +35,19 @@ Estas mejoras no cambian la lógica de negocio, solo la organización y limpieza
     -   [x] *Solución:* Mover a `public/css/battle-arena.css` y vincular con `<link>`.
     -   [x] *Riesgo:* Mínimo (chequear ruta de assets).
 
-2.  **Limpieza de Vistas (View Composers/Presenters) (PARCIAL):**
-    -   [ ] *Problema:* Cálculos de % HP y clases CSS (warning/critical) dentro de `@php` en la vista.
-    -   [ ] *Solución:* Calcular estos valores en el Controlador y pasarlos a la vista listos para usar, o usar un Presenter simple.
-    -   *Riesgo:* Mínimo.
+2.  **Limpieza de Vistas (View Composers/Presenters) (COMPLETADO):**
+    -   [x] *Problema:* Cálculos de % HP y clases CSS (warning/critical) dentro de `@php` en la vista.
+    -   [x] *Solución:* Calcular estos valores en el Controlador y pasarlos a la vista listos para usar, o usar un Presenter simple.
+    -   [x] *Riesgo:* Mínimo.
 
 3.  **Configuración de Constantes (COMPLETADO):**
     -   [x] *Problema:* Arrays de colores de tipos, items iniciales y límites en `PokemonHelper` y `BattleController`.
     -   [x] *Solución:* Mover a archivos `config/pokemon.php` y `config/battle.php`.
     -   *Riesgo:* Mínimo.
 
-4.  **Consistencia de Errores:**
-    -   [ ] *Problema:* Algunos métodos devuelven `null` silenciosamente en `try-catch` (ej. `PokemonHelper`).
-    -   [ ] *Solución:* Agregar Log::error con más contexto antes de retornar null.
+4.  **Consistencia de Errores (COMPLETADO):**
+    -   [x] *Problema:* Algunos métodos devuelven `null` silenciosamente en `try-catch` (ej. `PokemonHelper`).
+    -   [x] *Solución:* Agregar Log::error con más contexto antes de retornar null.
     -   *Riesgo:* Nulo (mejora observabilidad).
 
 ### ⚠️ COMPLEX / RISKY (Requiere Refactorización Profunda)

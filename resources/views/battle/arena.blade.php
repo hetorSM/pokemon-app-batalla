@@ -10,15 +10,6 @@
         <div class="bf-sky"></div>
         <div class="bf-ground"></div>
 
-        @php
-        $p = $battle['player_team'][$battle['player_active']];
-        $ai = $battle['ai_team'][$battle['ai_active']];
-        $pMaxHp = $p['max_hp'] ?? $p['battle_stats']['hp'] ?? $p['stats']['hp'];
-        $pHpPct = round(($p['current_hp'] / max($pMaxHp, 1)) * 100);
-        $aiMaxHp = $ai['max_hp'] ?? $ai['battle_stats']['hp'] ?? $ai['stats']['hp'];
-        $aiHpPct = round(($ai['current_hp'] / max($aiMaxHp, 1)) * 100);
-        @endphp
-
         {{-- ENEMY INFO BOX (top-left) --}}
         <div class="pkmn-info-box enemy-info">
             <div class="info-box-inner">
@@ -29,8 +20,7 @@
                 <div class="hp-bar-container">
                     <span class="hp-label">PS</span>
                     <div class="hp-bar-track">
-                        <div class="hp-bar-fill {{ $aiHpPct <= 20 ? 'critical' : ($aiHpPct <= 50 ? 'warning' : '') }}"
-                            id="aiHpBar" style="width: {{ $aiHpPct }}%"></div>
+                        <div class="hp-bar-fill {{ $aiHpClass }}" id="aiHpBar" style="width: {{ $aiHpPct }}%"></div>
                     </div>
                 </div>
                 {{-- Enemy team pokeballs --}}
@@ -274,7 +264,7 @@
 @endsection
 
 @push('styles')
-    <link rel="stylesheet" href="{{ asset('css/battle-arena.css') }}">
+<link rel="stylesheet" href="{{ asset('css/battle-arena.css') }}">
 @endpush
 
 @push('scripts')

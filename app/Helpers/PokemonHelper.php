@@ -139,7 +139,9 @@ class PokemonHelper
 
         }
         catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Error fetching Pokemon {$id}: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error("PokemonHelper::getPokemon($id) error: " . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return null;
         }
     }
@@ -258,6 +260,7 @@ class PokemonHelper
             return $result;
         }
         catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("PokemonHelper::getMoveDetails($moveName) error: " . $e->getMessage());
             return null;
         }
     }
@@ -640,7 +643,7 @@ class PokemonHelper
             }
         }
         catch (\Exception $e) {
-        // Error de BD, proceder a fetch
+            \Illuminate\Support\Facades\Log::warning("PokemonHelper::getOrFetchMove($moveName) DB lookup failed: " . $e->getMessage());
         }
 
         // 2. Obtener de PokéAPI
@@ -664,7 +667,7 @@ class PokemonHelper
                 );
             }
             catch (\Exception $e) {
-            // Ignorar errores de BD, solo retornar datos
+                \Illuminate\Support\Facades\Log::error("PokemonHelper::getOrFetchMove($moveName) failed to save to DB: " . $e->getMessage());
             }
             return $apiData;
         }

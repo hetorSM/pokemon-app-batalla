@@ -237,8 +237,27 @@ class BattleController extends Controller
             return redirect()->route('battle.select-mode');
         }
 
+        $p = $battle['player_team'][$battle['player_active']];
+        $ai = $battle['ai_team'][$battle['ai_active']];
+
+        $pMaxHp = $p['max_hp'] ?? $p['battle_stats']['hp'] ?? $p['stats']['hp'];
+        $pHpPct = round(($p['current_hp'] / max($pMaxHp, 1)) * 100);
+        $playerHpClass = $pHpPct <= 20 ? 'critical' : ($pHpPct <= 50 ? 'warning' : '');
+
+        $aiMaxHp = $ai['max_hp'] ?? $ai['battle_stats']['hp'] ?? $ai['stats']['hp'];
+        $aiHpPct = round(($ai['current_hp'] / max($aiMaxHp, 1)) * 100);
+        $aiHpClass = $aiHpPct <= 20 ? 'critical' : ($aiHpPct <= 50 ? 'warning' : '');
+
         return view('battle.arena', [
-            'battle' => $battle
+            'battle' => $battle,
+            'p' => $p,
+            'ai' => $ai,
+            'pMaxHp' => $pMaxHp,
+            'pHpPct' => $pHpPct,
+            'playerHpClass' => $playerHpClass,
+            'aiMaxHp' => $aiMaxHp,
+            'aiHpPct' => $aiHpPct,
+            'aiHpClass' => $aiHpClass
         ]);
     }
 
