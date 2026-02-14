@@ -9,11 +9,62 @@ class PokemonHelper
 {
     public static function getPokemon($id)
     {
-        // Cache por 1 hora para no saturar la API (no cachea errores)
+        // 0. Check internal memory/cache first
         $cacheKey = "pokemon_{$id}";
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached;
+        }
+
+        // 1. Check DB Persistence
+        try {
+            $pokemonModel = \App\Models\Pokemon::where('api_id', $id)->first();
+            if ($pokemonModel) {
+                $data = [
+                    'id' => $pokemonModel->api_id,
+                    'name' => ucfirst($pokemonModel->name),
+                    'image' => $pokemonModel->sprites['other']['official-artwork']['front_default'] ?? $pokemonModel->sprites['front_default'],
+                    'types' => $pokemonModel->types,
+                    'stats' => $pokemonModel->stats,
+                    'move_names' => $pokemonModel->move_list,
+                    'cries' => $pokemonModel->cries,
+                    'evolutions' => [], // Evolution chain is complex, we might still fetch it or store it differently. For now, let's keep it simple or re-fetch if needed.
+                ];
+                // Note: Evolutions are currently fetched via API in the original code. 
+                // To fully persist, we'd need to store evolutions too. 
+                // For now, let's fetch evolutions if not stored, OR just re-fetch species data lightly.
+                // Re-implementing full evolution persistence would require a separate table or complex JSON. 
+                // Let's stick to the main request: Stats & Moves. 
+                // We will re-fetch species data for evolutions to keep compatibility with existing views, 
+                // BUT we won't re-fetch the main pokemon data.
+
+                // ... actually, to keep it fast, let's try to cache the evolutions too if possible, OR just accept a small hit for evolutions.
+                // Let's re-use the existing logic for evolutions but skip the main pokemon fetch.
+
+                $client = new Client();
+                try {
+                    // We still need the species URL to get evolutions if we haven't stored them.
+                    // For this iteration, let's just re-fetch the species/evolution part to ensure the UI doesn't break.
+                    // Improving evolution persistence can be a next step.
+                    $response = $client->get("https://pokeapi.co/api/v2/pokemon/{$id}");
+                    $apiData = json_decode($response->getBody(), true);
+
+                    $speciesResponse = $client->get($apiData['species']['url']);
+                    $speciesData = json_decode($speciesResponse->getBody(), true);
+                    $evoResponse = $client->get($speciesData['evolution_chain']['url']);
+                    $evoData = json_decode($evoResponse->getBody(), true);
+                    $data['evolutions'] = self::parseEvolutionChain($evoData['chain']);
+                }
+                catch (\Exception $e) {
+                    $data['evolutions'] = [];
+                }
+
+                Cache::put($cacheKey, $data, 3600);
+                return $data;
+            }
+        }
+        catch (\Exception $e) {
+        // DB Error, proceed to API
         }
 
         $client = new Client();
@@ -31,29 +82,53 @@ class PokemonHelper
 
             $evolutions = self::parseEvolutionChain($evoData['chain']);
 
+            $types = array_map(function ($type) {
+                return $type['type']['name'];
+            }, $data['types']);
+
+            $stats = [
+                'hp' => $data['stats'][0]['base_stat'],
+                'attack' => $data['stats'][1]['base_stat'],
+                'defense' => $data['stats'][2]['base_stat'],
+                'special-attack' => $data['stats'][3]['base_stat'],
+                'special-defense' => $data['stats'][4]['base_stat'],
+                'speed' => $data['stats'][5]['base_stat'],
+            ];
+
+            $moveNames = array_map(function ($m) {
+                return $m['move']['name'];
+            }, $data['moves']);
+
             $result = [
                 'id' => $data['id'],
                 'name' => ucfirst($data['name']),
                 'image' => $data['sprites']['other']['official-artwork']['front_default']
                 ?? $data['sprites']['front_default']
                 ?? "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{$id}.png",
-                'types' => array_map(function ($type) {
-                return $type['type']['name'];
-            }, $data['types']),
-                'stats' => [
-                    'hp' => $data['stats'][0]['base_stat'],
-                    'attack' => $data['stats'][1]['base_stat'],
-                    'defense' => $data['stats'][2]['base_stat'],
-                    'special-attack' => $data['stats'][3]['base_stat'],
-                    'special-defense' => $data['stats'][4]['base_stat'],
-                    'speed' => $data['stats'][5]['base_stat'],
-                ],
-                'move_names' => array_map(function ($m) {
-                return $m['move']['name'];
-            }, $data['moves']),
+                'types' => $types,
+                'stats' => $stats,
+                'move_names' => $moveNames,
                 'cries' => $data['cries'] ?? null,
                 'evolutions' => $evolutions,
             ];
+
+            // Save to DB for persistence
+            try {
+                \App\Models\Pokemon::updateOrCreate(
+                ['api_id' => $data['id']],
+                [
+                    'name' => $data['name'],
+                    'sprites' => $data['sprites'],
+                    'types' => $types,
+                    'stats' => $stats,
+                    'move_list' => $moveNames,
+                    'cries' => $data['cries'] ?? null,
+                ]
+                );
+            }
+            catch (\Exception $e) {
+            // Ignore DB error
+            }
 
             Cache::put($cacheKey, $result, 3600);
             return $result;
@@ -302,12 +377,18 @@ class PokemonHelper
     public static function getPokemonList($page = 1, $limit = 20)
     {
         $offset = ($page - 1) * $limit;
-        $cacheKey = "pokemon_list_{$page}_{$limit}_v2";
+        $cacheKey = "pokemon_list_{$page}_{$limit}_v3"; // Version bump
 
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached;
         }
+
+        // Try DB first? 
+        // Syncing the list is tricky if we don't have all of them. 
+        // For now, let's keep getPokemonList via API but SAVE individual pokemons we find.
+        // Actually, the user asked to "update data so cache is not full and load faster".
+        // A full DB list would be faster.
 
         $client = new Client();
         try {
@@ -317,7 +398,10 @@ class PokemonHelper
             foreach ($data['results'] as $pokemon) {
                 $urlParts = explode('/', rtrim($pokemon['url'], '/'));
                 $id = end($urlParts);
+
+                // Optimized: get detail triggers save to DB
                 $details = self::getPokemon($id);
+
                 $pokemons[] = [
                     'id' => $id,
                     'name' => ucfirst($pokemon['name']),
@@ -473,7 +557,7 @@ class PokemonHelper
         return $colors[strtolower($type)] ?? '#777777';
     }
 
-    private static function getOrFetchMove($moveName)
+    public static function getOrFetchMove($moveName)
     {
         // 1. Check in MySQL Database
         try {

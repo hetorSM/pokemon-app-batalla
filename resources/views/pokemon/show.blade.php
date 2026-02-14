@@ -172,6 +172,34 @@
                 </div>
                 @endif
 
+                <!-- Moves Analytics -->
+                <div class="silph-moves-module mt-5">
+                    <div class="silph-section-header mb-4 justify-content-between">
+                        <div><span class="header-line"></span> COMBAT_CAPABILITIES</div>
+                        <div id="moves-loading-indicator" class="text-warning small d-none">
+                            <i class="fas fa-sync fa-spin"></i> SYNCING_MOVE_DATABASE...
+                        </div>
+                    </div>
+
+                    <div class="silph-moves-grid">
+                        @php
+                        // We only have names initially. Check DB simply for presence to color code?
+                        // For performance, we assume all are "Pending" details unless we query simply.
+                        // Let's just list them and let JS fill the gaps.
+                        @endphp
+                        @foreach($pokemon['move_names'] as $moveName)
+                        <div class="silph-move-chip" data-move-name="{{ $moveName }}">
+                            <div class="move-name">{{ ucfirst(str_replace('-', ' ', $moveName)) }}</div>
+                            <div class="move-meta">
+                                <span class="move-type" id="type-{{ $moveName }}">---</span>
+                                <span class="move-power" id="power-{{ $moveName }}">PWR: --</span>
+                            </div>
+                            <div class="move-load-bar"></div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -564,6 +592,84 @@
             font-size: 3rem;
         }
     }
+
+    /* Moves Grid */
+    .silph-moves-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+        max-height: 400px;
+        overflow-y: auto;
+        padding-right: 5px;
+    }
+
+    .silph-move-chip {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 8px 12px;
+        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.2s;
+    }
+
+    .silph-move-chip:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .silph-move-chip.loaded {
+        border-right: 3px solid var(--type-color, #777);
+    }
+
+    .move-name {
+        font-family: var(--mont-bold);
+        font-size: 11px;
+        font-weight: 800;
+        margin-bottom: 4px;
+        color: #ddd;
+    }
+
+    .move-meta {
+        font-size: 9px;
+        color: #888;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .move-load-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 2px;
+        width: 100%;
+        background: rgba(0, 242, 255, 0.3);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.3s;
+    }
+
+    .silph-move-chip.loading .move-load-bar {
+        animation: load-pulse 1s infinite;
+    }
+
+    @keyframes load-pulse {
+        0% {
+            transform: scaleX(0);
+            opacity: 1;
+        }
+
+        50% {
+            transform: scaleX(1);
+            opacity: 0.5;
+        }
+
+        100% {
+            transform: scaleX(0);
+            opacity: 0;
+            transform-origin: right;
+        }
+    }
 </style>
 @endpush
 
@@ -593,9 +699,90 @@
             setTimeout(() => {
                 art.style.transform = 'scale(1.1)';
                 art.style.filter = 'drop-shadow(0 0 50px rgba(255,255,255,0.2))';
-            }, 500)  }
+            }, 500)
+        }
 
         audio.play();
     }
+
+    // Async Move Fetching
+    const TYPE_COLORS = {
+        'normal': '#A8A878', 'fire': '#F08030', 'water': '#6890F0', 'grass': '#78C850',
+        'electric': '#F8D030', 'ice': '#98D8D8', 'fighting': '#C03028', 'poison': '#A040A0',
+        'ground': '#E0C068', 'flying': '#A890F0', 'psychic': '#F85888', 'bug': '#A8B820',
+        'rock': '#B8A038', 'ghost': '#705898', 'dragon': '#7038F8', 'dark': '#705848',
+        'steel': '#B8B8D0', 'fairy': '#EE99AC'
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // ... existing code ...
+
+        const moveChips = document.querySelectorAll('.silph-move-chip');
+        const loader = document.getElementById('moves-loading-indicator');
+
+        // We will fetch moves in batches to be efficient
+        const movesToFetch = [];
+        moveChips.forEach(chip => {
+            movesToFetch.push(chip.getAttribute('data-move-name'));
+        });
+
+        if (movesToFetch.length > 0) {
+            loader.classList.remove('d-none');
+            fetchMovesBatch(movesToFetch);
+        }
+
+        async function fetchMovesBatch(moves) {
+            // Chunking into batches of 10 to avoid URI too long or huge payloads
+            const chunkSize = 10;
+            for (let i = 0; i < moves.length; i += chunkSize) {
+                const chunk = moves.slice(i, i + chunkSize);
+                try {
+                    const response = await fetch('/api/moves/batch', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({ moves: chunk })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        updateMoveChips(data);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch moves chunk", error);
+                }
+
+                // Small delay to be nice to the server/UI
+                await new Promise(r => setTimeout(r, 200));
+            }
+            loader.classList.add('d-none');
+        }
+
+        function updateMoveChips(data) {
+            // data is keyed by move name
+            for (const [name, moveData] of Object.entries(data)) {
+                if (!moveData) continue;
+
+                const chip = document.querySelector(`.silph-move-chip[data-move-name="${name}"]`);
+                if (chip) {
+                    chip.classList.add('loaded');
+                    chip.style.setProperty('--type-color', TYPE_COLORS[moveData.type] || '#777');
+
+                    const typeEl = document.getElementById(`type-${name}`);
+                    const powerEl = document.getElementById(`power-${name}`);
+
+                    if (typeEl) {
+                        typeEl.textContent = moveData.type.toUpperCase();
+                        typeEl.style.color = TYPE_COLORS[moveData.type] || '#888';
+                    }
+                    if (powerEl) {
+                        powerEl.textContent = moveData.power ? `PWR: ${moveData.power}` : 'STATUS';
+                    }
+                }
+            }
+        }
+    });
 </script>
 @endpush
