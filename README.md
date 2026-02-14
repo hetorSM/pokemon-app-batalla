@@ -64,6 +64,13 @@ La aplicación estará disponible en [http://localhost](http://localhost).
 - **API**: PokéAPI
 - **Frontend**: Blade, Vanilla JavaScript, CSS (Bootstrap)
 - **Cliente HTTP**: GuzzleHttp
+- **Base de datos**: MySQL
+
+### Instalación del cliente HTTP
+
+```bash
+./vendor/bin/sail composer require guzzlehttp/guzzle
+```   
 
 ## Funcionalidades Principales
 
@@ -77,7 +84,6 @@ La aplicación estará disponible en [http://localhost](http://localhost).
 ## Documentación Adicional
 
 - [Documento Técnico](./DocumentoTecnico.md): Detalles sobre la arquitectura y el flujo de datos.
-- [Presentación del Proyecto](./presentacion.md): Resumen de pantallas y experiencia de usuario.
 
 ---
 
