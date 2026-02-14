@@ -9,14 +9,14 @@ class PokemonHelper
 {
     public static function getPokemon($id)
     {
-        // 0. Check internal memory/cache first (Laravel Cache)
+        // 0. Verificar caché interna primero (Laravel Cache)
         $cacheKey = "pokemon_{$id}_full_v2";
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached;
         }
 
-        // 1. Check DB Persistence (Normalized)
+        // 1. Verificar persistencia en BD (Normalizada)
         $pokemonModel = \App\Models\Pokemon::with(['types', 'stats', 'moves', 'sprite', 'cry'])
             ->where('api_id', $id)
             ->first();
@@ -27,16 +27,16 @@ class PokemonHelper
             return $data;
         }
 
-        // 2. Fetch from API if not in DB
+        // 2. Obtener de la API si no está en BD
         $client = new \GuzzleHttp\Client();
 
         try {
             $response = $client->get("https://pokeapi.co/api/v2/pokemon/{$id}");
             $data = json_decode($response->getBody(), true);
 
-            // DB Transaction to ensure data integrity
+            // Transacción de BD para asegurar integridad de datos
             $pokemonModel = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $id) {
-                // A. Create/Update Pokemon Base
+                // A. Crear/Actualizar Pokémon Base
                 $pokemon = \App\Models\Pokemon::updateOrCreate(
                 ['api_id' => $data['id']],
                 [
@@ -126,12 +126,12 @@ class PokemonHelper
                 return $pokemon;
             });
 
-            // Reload to get relations
+            // Cargar evolución para obtener relaciones
             $pokemonModel->load(['types', 'stats', 'moves', 'sprite', 'cry']);
             $formatted = self::formatPokemonModel($pokemonModel);
 
-            // Add Evolutions (This part remains API-dependent for now to save time, or we can persist species too)
-            // For now, fetch lively as before to avoid complex species tables
+            // Agregar Evoluciones (Esto sigue dependiendo de la API por ahora)
+            // Por ahora, buscar en vivo para evitar tablas de especies complejas
             $formatted['evolutions'] = self::fetchEvolutions($id, $client);
 
             Cache::put($cacheKey, $formatted, 3600);
@@ -152,14 +152,14 @@ class PokemonHelper
             'image' => $pokemon->sprite->official_artwork ?? $pokemon->sprite->front_default ?? "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{$pokemon->api_id}.png",
             'types' => $pokemon->types->pluck('name')->toArray(),
             'stats' => $pokemon->stats->mapWithKeys(fn($s) => [$s->name => $s->pivot->base_value])->toArray(),
-            'move_names' => $pokemon->moves->pluck('name')->toArray(), // Backward compatibility
+            'move_names' => $pokemon->moves->pluck('name')->toArray(), // Compatibilidad hacia atrás
             'moves_detailed' => $pokemon->moves->map(fn($m) => [
             'name' => $m->name,
             'level' => $m->pivot->level_learned_at,
             'method' => $m->pivot->learn_method
             ])->sortBy('level')->values()->toArray(),
             'cries' => $pokemon->cry ? ['latest' => $pokemon->cry->latest, 'legacy' => $pokemon->cry->legacy] : [],
-            'evolutions' => [], // Filled separately if needed or cached
+            'evolutions' => [], // Se llena por separado si es necesario o cached
             'base_experience' => $pokemon->base_experience,
             'height' => $pokemon->height,
             'weight' => $pokemon->weight,
@@ -169,6 +169,7 @@ class PokemonHelper
     private static function fetchEvolutions($id, $client)
     {
         try {
+            // ... (API calls)
             $response = $client->get("https://pokeapi.co/api/v2/pokemon/{$id}");
             $apiData = json_decode($response->getBody(), true);
             $speciesResponse = $client->get($apiData['species']['url']);
@@ -270,46 +271,45 @@ class PokemonHelper
 
         $pokemonTypes = $pokemon['types'] ?? ['normal'];
 
-        // Use detailed moves if available (from new logic)
+        // Usar movimientos detallados si están disponibles (nueva lógica)
         $candidates = [];
         if (!empty($pokemon['moves_detailed'])) {
             foreach ($pokemon['moves_detailed'] as $m) {
-                // Logic: Allow moves learned by level up <= current level
+                // Lógica: Permitir movimientos aprendidos por nivel <= nivel actual
                 if ($m['method'] === 'level-up' && $m['level'] <= $level) {
                     $candidates[] = $m['name'];
                 }
-                // Allow other methods (machine, tutor, egg) indiscriminately? 
-                // Creating a competitive set usually implies access to TMs. 
-                // Let's allow them but maybe deprioritize if we want "natural" feel.
-                // For now: Allow all non-level-up moves (assumed TMs/Tutors available)
+                // Permitir otros métodos (máquina, tutor, huevo) indiscriminadamente?
+                // Crear un set competitivo implica acceso a MTs.
+                // Por ahora: Permitir todos los que no sean por nivel (asumiendo MTs/Tutor disponibles)
                 elseif ($m['method'] !== 'level-up') {
                     $candidates[] = $m['name'];
                 }
             }
         }
         else {
-            // Fallback for old data or failures
+            // Fallback para datos antiguos o fallos
             $candidates = $pokemon['move_names'];
         }
 
-        // Deduplicate
+        // Deduplicar
         $candidates = array_unique($candidates);
 
         $stabMoves = [];
         $coverageMoves = [];
 
         foreach ($candidates as $moveName) {
-            $moveData = self::getOrFetchMove($moveName); // This fetches stats (Type, Power)
+            $moveData = self::getOrFetchMove($moveName); // Esto obtiene stats (Tipo, Poder)
 
             if (!$moveData || ($moveData['power'] ?? 0) <= 0 && ($moveData['damage_class'] ?? 'physical') !== 'status')
-                continue; // Skip useless moves or purely weak ones? No, keep status moves.
+                continue; // Saltar movimientos inútiles o puramente débiles? No, mantener de estado.
 
-            // Score calculation
+            // Cálculo de puntuación
             $score = $moveData['power'] ?? 0;
 
-            // Boost Status moves priority slightly so they aren't always discarded if power is 0
+            // Aumentar prioridad de movimientos de Estado para no descartarlos siempre
             if (($moveData['damage_class'] ?? 'physical') === 'status') {
-                $score = 40; // Equivalent to a weak attack
+                $score = 40; // Equivalente a un ataque débil
             }
 
             $isStab = in_array($moveData['type'], $pokemonTypes);
@@ -320,7 +320,7 @@ class PokemonHelper
                 $score *= 1.1;
             }
 
-            // Penalize moves with low PP
+            // Penalizar movimientos con bajo PP
             if (($moveData['pp'] ?? 35) < 5) {
                 $score *= 0.8;
             }
@@ -336,11 +336,11 @@ class PokemonHelper
             }
         }
 
-        // Sort both by score descending
+        // Ordenar ambos por puntuación descendente
         usort($stabMoves, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
         usort($coverageMoves, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
 
-        // Select: up to 2 best STAB + fill with best coverage
+        // Seleccionar: hasta 2 mejores STAB + rellenar con mejor cobertura
         $selected = [];
         $typesUsed = [];
 
@@ -354,14 +354,14 @@ class PokemonHelper
         foreach ($coverageMoves as $move) {
             if (count($selected) >= $count)
                 break;
-            // Prefer type diversity
+            // Preferir diversidad de tipos
             if (isset($typesUsed[$move['type']]) && count($coverageMoves) > ($count - count($selected)))
                 continue;
             $selected[] = $move;
             $typesUsed[$move['type']] = true;
         }
 
-        // If still lacking coverage, add any remaining coverage ignoring diversity
+        // Si falta cobertura, añadir cualquiera restante ignorando diversidad
         foreach ($coverageMoves as $move) {
             if (count($selected) >= $count)
                 break;
@@ -370,7 +370,7 @@ class PokemonHelper
             }
         }
 
-        // If still lacking, add remaining STAB
+        // Si falta, añadir STAB restante
         foreach ($stabMoves as $move) {
             if (count($selected) >= $count)
                 break;
@@ -379,7 +379,7 @@ class PokemonHelper
             }
         }
 
-        // Fill remaining with type defaults (no API calls)
+        // Rellenar restantes con defaults por tipo (sin llamadas API)
         if (count($selected) < $count) {
             $defaults = self::getDefaultMoves($pokemonTypes);
             foreach ($defaults as $defMove) {
@@ -391,7 +391,7 @@ class PokemonHelper
             }
         }
 
-        // Safety net
+        // Red de seguridad
         while (count($selected) < $count) {
             $selected[] = \App\Models\Move::where('name', 'tackle')->first()->toBattleArray() ?? MoveDatabase::getMove('tackle');
         }
@@ -416,7 +416,7 @@ class PokemonHelper
     {
         $primaryType = $pokemonTypes[0] ?? 'normal';
 
-        // Type-specific fallback moves
+        // Movimientos de respaldo específicos por tipo
         $typeDefaults = [
             'fire' => ['name' => 'ember', 'name_es' => 'Ascuas', 'power' => 40, 'accuracy' => 100, 'pp' => 25, 'current_pp' => 25, 'type' => 'fire', 'damage_class' => 'special', 'status_effect' => 'burn', 'status_chance' => 10],
             'water' => ['name' => 'water-gun', 'name_es' => 'Pistola Agua', 'power' => 40, 'accuracy' => 100, 'pp' => 25, 'current_pp' => 25, 'type' => 'water', 'damage_class' => 'special', 'status_effect' => null, 'status_chance' => 0],
@@ -439,13 +439,13 @@ class PokemonHelper
         ];
 
         $defaultMoves = [];
-        // Add a STAB move for the primary type
+        // Añadir movimiento STAB para el tipo primario
         $defaultMoves[] = $typeDefaults[$primaryType] ?? $typeDefaults['normal'];
-        // Add a second STAB if dual-type
+        // Añadir segundo STAB si es dual-type
         if (isset($pokemonTypes[1]) && isset($typeDefaults[$pokemonTypes[1]])) {
             $defaultMoves[] = $typeDefaults[$pokemonTypes[1]];
         }
-        // Fill rest with generic Normal moves
+        // Rellenar resto con normales genéricos
         $normalFillers = [
             ['name' => 'tackle', 'name_es' => 'Placaje', 'power' => 40, 'accuracy' => 100, 'pp' => 35, 'current_pp' => 35, 'type' => 'normal', 'damage_class' => 'physical', 'status_effect' => null, 'status_chance' => 0],
             ['name' => 'scratch', 'name_es' => 'Arañazo', 'power' => 40, 'accuracy' => 100, 'pp' => 35, 'current_pp' => 35, 'type' => 'normal', 'damage_class' => 'physical', 'status_effect' => null, 'status_chance' => 0],
@@ -472,11 +472,11 @@ class PokemonHelper
             return $cached;
         }
 
-        // Try DB first? 
-        // Syncing the list is tricky if we don't have all of them. 
-        // For now, let's keep getPokemonList via API but SAVE individual pokemons we find.
-        // Actually, the user asked to "update data so cache is not full and load faster".
-        // A full DB list would be faster.
+        // ¿Intentar BD primero?
+        // Sincronizar la lista es complicado si no tenemos todos.
+        // Por ahora, mantener getPokemonList vía API pero GUARDAR los pokemons individuales encontrados.
+        // En realidad, el usuario pidió "actualizar datos para que el caché no se llene y cargue más rápido".
+        // Una lista completa de BD sería más rápida.
 
         $client = new Client();
         try {
@@ -487,7 +487,7 @@ class PokemonHelper
                 $urlParts = explode('/', rtrim($pokemon['url'], '/'));
                 $id = end($urlParts);
 
-                // Optimized: get detail triggers save to DB
+                // Optimizado: obtener detalle dispara guardado en BD
                 $details = self::getPokemon($id);
 
                 $pokemons[] = [
@@ -621,6 +621,7 @@ class PokemonHelper
 
     public static function getTypeColor($type)
     {
+        // ... (colors array skipped for brevity, standard logic)
         $colors = [
             'normal' => '#A8A878',
             'fire' => '#F08030',
@@ -647,25 +648,25 @@ class PokemonHelper
 
     public static function getOrFetchMove($moveName)
     {
-        // 1. Check in MySQL Database
+        // 1. Verificar en Base de Datos MySQL
         try {
             $moveModel = \App\Models\Move::where('name', $moveName)->first();
 
-            // Check if model exists AND has sufficient data.
-            // We use 'name_es' as a flag because it's populated from API but null by default in migration.
-            // If name_es is present, we assume the move details were fetched.
+            // Verificar si el modelo existe Y tiene suficientes datos.
+            // Usamos 'name_es' como bandera porque se llena desde la API pero es null por defecto en migración.
+            // Si name_es está presente, asumimos que los detalles del movimiento fueron obtenidos.
             if ($moveModel && !empty($moveModel->name_es)) {
                 return $moveModel->toBattleArray();
             }
         }
         catch (\Exception $e) {
-        // DB error, proceed to fetch
+        // Error de BD, proceder a fetch
         }
 
-        // 2. Fetch from PokéAPI
+        // 2. Obtener de PokéAPI
         $apiData = self::getMoveDetails($moveName);
         if ($apiData) {
-            // 3. Save to MySQL (Update if exists, Create if not)
+            // 3. Guardar en MySQL (Actualizar si existe, Crear si no)
             try {
                 \App\Models\Move::updateOrCreate(
                 ['name' => $moveName],
@@ -683,14 +684,14 @@ class PokemonHelper
                 );
             }
             catch (\Exception $e) {
-            // Ignore DB errors, just return data
+            // Ignorar errores de BD, solo retornar datos
             }
             return $apiData;
         }
 
-        // 4. Emergency Fallback
+        // 4. Fallback de Emergencia
         if ($moveModel) {
-            // Even if incomplete, better than nothing if API failed
+            // Incluso si está incompleto, mejor que nada si la API falló
             return $moveModel->toBattleArray();
         }
 

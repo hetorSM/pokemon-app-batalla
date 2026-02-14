@@ -10,21 +10,21 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        // 1. Create Types Master Table
+        // 1. Crear Tabla Maestra de Tipos
         Schema::create('types', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             $table->timestamps();
         });
 
-        // 2. Create Stats Master Table
+        // 2. Crear Tabla Maestra de Estadísticas
         Schema::create('stats', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             $table->timestamps();
         });
 
-        // 3. Create Pokemon Types Pivot
+        // 3. Crear Tabla Pivote de Tipos de Pokémon
         Schema::create('pokemon_types', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pokemon_id')->constrained('pokemons')->onDelete('cascade');
@@ -33,7 +33,7 @@ return new class extends Migration {
             $table->timestamps();
         });
 
-        // 4. Create Pokemon Stats Pivot
+        // 4. Crear Tabla Pivote de Estadísticas de Pokémon
         Schema::create('pokemon_stats', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pokemon_id')->constrained('pokemons')->onDelete('cascade');
@@ -42,7 +42,7 @@ return new class extends Migration {
             $table->timestamps();
         });
 
-        // 5. Create Pokemon Moves Pivot
+        // 5. Crear Tabla Pivote de Movimientos de Pokémon
         Schema::create('pokemon_moves', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pokemon_id')->constrained('pokemons')->onDelete('cascade');
@@ -52,7 +52,7 @@ return new class extends Migration {
             $table->timestamps();
         });
 
-        // 6. Create Pokemon Sprites Table
+        // 6. Crear Tabla de Sprites de Pokémon
         Schema::create('pokemon_sprites', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pokemon_id')->constrained('pokemons')->onDelete('cascade');
@@ -63,7 +63,7 @@ return new class extends Migration {
             $table->timestamps();
         });
 
-        // 7. Create Pokemon Cries Table
+        // 7. Crear Tabla de Gritos de Pokémon
         Schema::create('pokemon_cries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pokemon_id')->constrained('pokemons')->onDelete('cascade');
@@ -72,7 +72,7 @@ return new class extends Migration {
             $table->timestamps();
         });
 
-        // 8. Modify Pokemons Table (Drop JSON columns)
+        // 8. Modificar Tabla Pokemons (Eliminar columnas JSON)
         Schema::table('pokemons', function (Blueprint $table) {
             $table->dropColumn(['sprites', 'types', 'stats', 'move_list', 'cries']);
             $table->integer('base_experience')->nullable();
