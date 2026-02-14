@@ -632,6 +632,7 @@ class BattleController extends Controller
                     'damage_class' => $move['damage_class'] ?? 'physical',
                 ];
 
+                // Calcular daño
                 $level = $battle['level'] ?? 50;
                 $result = $this->battleService->calculateDamage($aiPokemon, $playerPokemon, $move, $level);
                 $moveName = $move['name_es'] ?? ucfirst(str_replace('-', ' ', $move['name']));
@@ -640,29 +641,43 @@ class BattleController extends Controller
                     $messages[] = "¡{$aiPokemon['name']} usó {$moveName}, pero falló!";
                 }
                 else {
-                    $battle['player_team'][$playerIdx]['current_hp'] = max(0, $playerPokemon['current_hp'] - $result['damage']);
+                    if ($result['damage'] > 0) {
+                        $battle['player_team'][$playerIdx]['current_hp'] = max(0, $playerPokemon['current_hp'] - $result['damage']);
+                        $messages[] = "¡{$aiPokemon['name']} usó {$moveName}! (-{$result['damage']} HP)";
 
-                    $messages[] = "¡{$aiPokemon['name']} usó {$moveName}! (-{$result['damage']} HP)";
+                        $effMsg = $this->battleService->getEffectivenessMessage($result['effectiveness']);
+                        if ($effMsg)
+                            $messages[] = $effMsg;
 
-                    $effMsg = $this->battleService->getEffectivenessMessage($result['effectiveness']);
-                    if ($effMsg)
-                        $messages[] = $effMsg;
-
-                    if ($result['critical']) {
-                        $messages[] = "¡Golpe crítico!";
+                        if ($result['critical']) {
+                            $messages[] = "¡Golpe crítico!";
+                        }
+                    }
+                    else {
+                        $messages[] = "¡{$aiPokemon['name']} usó {$moveName}!";
                     }
 
                     // Aplicar efecto de estado
-                    if (!empty($move['status_effect']) && $battle['player_team'][$playerIdx]['current_hp'] > 0) {
-                        $statusChance = $move['status_chance'] ?? 0;
-                        if ($statusChance > 0) {
-                            $sResult = $this->statusService->applyStatus(
-                                $battle['player_team'][$playerIdx],
-                                $move['status_effect'],
-                                $statusChance
-                            );
-                            if ($sResult['applied'] && $sResult['message']) {
-                                $messages[] = $sResult['message'];
+                    if (!empty($move['status_effect'])) {
+                        if ($move['status_effect'] === 'heal') {
+                            $maxHp = $aiPokemon['max_hp'] ?? $aiPokemon['battle_stats']['hp'];
+                            $healAmount = floor($maxHp / 2);
+                            $oldHp = $aiPokemon['current_hp'];
+                            $battle['ai_team'][$aiIdx]['current_hp'] = min($maxHp, $oldHp + $healAmount);
+                            $actualHeal = $battle['ai_team'][$aiIdx]['current_hp'] - $oldHp;
+                            $messages[] = "¡{$aiPokemon['name']} recuperó salud! (+{$actualHeal} HP)";
+                        }
+                        elseif ($battle['player_team'][$playerIdx]['current_hp'] > 0) {
+                            $statusChance = $move['status_chance'] ?? 0;
+                            if ($statusChance > 0) {
+                                $sResult = $this->statusService->applyStatus(
+                                    $battle['player_team'][$playerIdx],
+                                    $move['status_effect'],
+                                    $statusChance
+                                );
+                                if ($sResult['applied'] && $sResult['message']) {
+                                    $messages[] = $sResult['message'];
+                                }
                             }
                         }
                     }
