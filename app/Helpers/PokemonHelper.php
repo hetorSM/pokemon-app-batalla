@@ -152,12 +152,14 @@ class PokemonHelper
         $pokemonTypes = $pokemon['types'] ?? ['normal'];
         $allMoveNames = $pokemon['move_names'];
 
-        // Use hardcoded MoveDatabase — NO API calls needed
         $stabMoves = [];
         $coverageMoves = [];
 
         foreach ($allMoveNames as $moveName) {
-            $moveData = MoveDatabase::getMove($moveName);
+            // Updated logic: Try DB -> API -> Fallback
+            $moveData = self::getOrFetchMove($moveName);
+
+            // If still null (API failed and not in emergency DB), skip
             if (!$moveData)
                 continue;
 
@@ -469,5 +471,46 @@ class PokemonHelper
         ];
 
         return $colors[strtolower($type)] ?? '#777777';
+    }
+
+    private static function getOrFetchMove($moveName)
+    {
+        // 1. Check in MySQL Database
+        try {
+            $moveModel = \App\Models\Move::where('name', $moveName)->first();
+            if ($moveModel) {
+                return $moveModel->toBattleArray();
+            }
+        }
+        catch (\Exception $e) {
+        // DB error, proceed to fetch
+        }
+
+        // 2. Fetch from PokéAPI
+        $apiData = self::getMoveDetails($moveName);
+        if ($apiData) {
+            // 3. Save to MySQL
+            try {
+                \App\Models\Move::create([
+                    'name' => $apiData['name'],
+                    'name_es' => $apiData['name_es'],
+                    'power' => $apiData['power'],
+                    'accuracy' => $apiData['accuracy'],
+                    'pp' => $apiData['pp'],
+                    'type' => $apiData['type'],
+                    'damage_class' => $apiData['damage_class'],
+                    'status_effect' => $apiData['status_effect'],
+                    'status_chance' => $apiData['status_chance'],
+                    'priority' => $apiData['priority'],
+                ]);
+            }
+            catch (\Exception $e) {
+            // Ignore DB errors, just return data
+            }
+            return $apiData;
+        }
+
+        // 4. Emergency Fallback
+        return MoveDatabase::getMove($moveName);
     }
 }
