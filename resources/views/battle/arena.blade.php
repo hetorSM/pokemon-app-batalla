@@ -239,8 +239,12 @@
             @endif
             <div class="result-actions">
                 <a href="{{ $battle['mode'] == 'local' ? route('battle.setup.multiplayer') : route('battle.setup.ai') }}"
-                    class="btn-pokemon-retro" style="margin-right:10px">REVANCHA</a>
-                <a href="{{ route('battle.finish') }}" class="btn-pokemon-retro blue">MENÚ</a>
+                    class="btn-pokemon-retro" style="margin-right:25px">
+                    <span style="margin-left:20px">REVANCHA</span>
+                </a>
+                <a href="{{ route('battle.finish') }}" class="btn-pokemon-retro blue">
+                    <span style="margin-left:20px">MENÚ</span>
+                </a>
             </div>
         </div>
         @endif

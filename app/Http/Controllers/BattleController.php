@@ -6,6 +6,7 @@ use App\Services\BattleService;
 use App\Services\AIService;
 use App\Services\StatusEffectService;
 use App\Services\ItemService;
+use App\Services\BattleLogService;
 use App\Helpers\PokemonHelper;
 use Illuminate\Http\Request;
 
@@ -15,13 +16,21 @@ class BattleController extends Controller
     protected $aiService;
     protected $statusService;
     protected $itemService;
+    protected $battleLogService;
 
-    public function __construct(BattleService $battleService, AIService $aiService, StatusEffectService $statusService, ItemService $itemService)
+    public function __construct(
+        BattleService $battleService,
+        AIService $aiService,
+        StatusEffectService $statusService,
+        ItemService $itemService,
+        BattleLogService $battleLogService
+        )
     {
         $this->battleService = $battleService;
         $this->aiService = $aiService;
         $this->statusService = $statusService;
         $this->itemService = $itemService;
+        $this->battleLogService = $battleLogService;
     }
 
     /**
@@ -145,8 +154,10 @@ class BattleController extends Controller
 
         session(['current_battle' => $battleData]);
 
-        $this->addToLog("¡Comienza la batalla local! (Nivel {$level})");
-        $this->addToLog("Jugador 1 vs Jugador 2");
+        $this->battleLogService->persistLogs($battleData, [
+            "¡Comienza la batalla local! (Nivel {$level})",
+            "Jugador 1 vs Jugador 2"
+        ]);
 
         return redirect()->route('battle.arena');
     }
@@ -220,8 +231,11 @@ class BattleController extends Controller
         session(['current_battle' => $battleData]);
 
         // Primer mensaje del log
-        $this->addToLog("¡Comienza la batalla! (Nivel {$level})");
-        $this->addToLog("Tu {$playerTeam[0]['name']} se enfrenta a {$aiTeam[0]['name']} de la IA!");
+        $this->battleLogService->persistLogs($battleData, [
+            "¡Comienza la batalla! (Nivel {$level})",
+            "Tu {$playerTeam[0]['name']} se enfrenta a {$aiTeam[0]['name']} de la IA!"
+        ]);
+        session(['current_battle' => $battleData]);
 
         return redirect()->route('battle.arena');
     }
@@ -547,8 +561,7 @@ class BattleController extends Controller
 
     private function saveBattleState($battle, $messages)
     {
-        foreach ($messages as $m)
-            $this->addToLog($m);
+        $this->battleLogService->persistLogs($battle, $messages);
         session(['current_battle' => $battle]);
     }
 
@@ -588,14 +601,11 @@ class BattleController extends Controller
             if ($this->battleService->checkVictory($battle['ai_team'])) {
                 $battle['winner'] = 'player';
                 $messages[] = __('battle.combat.win', ['winner' => 'Jugador 1']);
-                foreach ($messages as $m)
-                    $this->addToLog($m);
-                session(['current_battle' => $battle]);
+                $this->saveBattleState($battle, $messages);
                 return $this->battleJsonResponse($battle, $messages, 'status_damage');
             }
 
-            foreach ($messages as $m)
-                $this->addToLog($m);
+            $this->saveBattleState($battle, $messages);
             $battle['turn'] = 'player';
             $battle['turn_number'] = ($battle['turn_number'] ?? 1) + 1;
             session(['current_battle' => $battle]);
@@ -604,8 +614,7 @@ class BattleController extends Controller
 
         // Si el estado le impide actuar
         if (!$statusResult['can_act']) {
-            foreach ($messages as $m)
-                $this->addToLog($m);
+            $this->saveBattleState($battle, $messages);
             $battle['turn'] = 'player';
             $battle['turn_number'] = ($battle['turn_number'] ?? 1) + 1;
             session(['current_battle' => $battle]);
@@ -779,18 +788,14 @@ class BattleController extends Controller
         if ($this->battleService->checkVictory($battle['player_team'])) {
             $battle['winner'] = 'ai';
             $messages[] = __('battle.combat.win', ['winner' => 'La IA']);
-            foreach ($messages as $m)
-                $this->addToLog($m);
-            session(['current_battle' => $battle]);
+            $this->saveBattleState($battle, $messages);
             return $this->battleJsonResponse($battle, $messages, $aiDecision['action']);
         }
 
         // Volver al turno del jugador
         $battle['turn'] = 'player';
         $battle['turn_number'] = ($battle['turn_number'] ?? 1) + 1;
-        foreach ($messages as $m)
-            $this->addToLog($m);
-        session(['current_battle' => $battle]);
+        $this->saveBattleState($battle, $messages);
 
         return $this->battleJsonResponse($battle, $messages, $aiDecision['action']);
     }
@@ -894,23 +899,6 @@ class BattleController extends Controller
             }
         }
         return $team;
-    }
-
-    /**
-     * Añadir mensaje al log
-     */
-    private function addToLog($message)
-    {
-        $battle = session('current_battle', []);
-        $battle['log'][] = [
-            'message' => $message,
-            'time' => now()->format('H:i:s')
-        ];
-        // Mantener solo los últimos 30 mensajes
-        if (count($battle['log']) > 30) {
-            $battle['log'] = array_slice($battle['log'], -30);
-        }
-        session(['current_battle' => $battle]);
     }
 
     /**
