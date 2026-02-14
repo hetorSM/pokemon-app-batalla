@@ -24,7 +24,7 @@ Para evitar romper el proyecto ("muerte por actualización masiva"), abordaremos
 ### Fase 2: Reducción del Monolito (BattleController) - Parte 1
 *Objetivo: Extraer lógica auxiliar sin romper el flujo principal.*
 - [x] **Extracción de Logs:** La lógica que formatea mensajes de batalla (HTML colors, nombres) ocupa mucho espacio. Moverla a un `BattleLogService` o `BattlePresenter`.
-- [ ] **Validación de Acciones:** Extraer las validaciones de `action()` (¿es mi turno? ¿tengo HP?) a un FormRequest o método privado dedicado.
+- [x] **Validación de Acciones:** Extraer las validaciones de `action()` (¿es mi turno? ¿tengo HP?) a un FormRequest o método privado dedicado.
 
 ### Fase 3: Estandarización de `PokemonHelper`
 *Objetivo: Mejorar la robustez de las transacciones de base de datos.*

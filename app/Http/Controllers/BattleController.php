@@ -9,6 +9,7 @@ use App\Services\ItemService;
 use App\Services\BattleLogService;
 use App\Helpers\PokemonHelper;
 use Illuminate\Http\Request;
+use App\Http\Requests\BattleActionRequest;
 
 class BattleController extends Controller
 {
@@ -278,22 +279,14 @@ class BattleController extends Controller
     /**
      * Realizar acción del jugador
      */
-    public function action(Request $request)
+    public function action(BattleActionRequest $request)
     {
         $battle = session('current_battle');
+        $actor = $battle['turn'] ?? 'player';
 
-        if (!$battle || $battle['winner']) {
-            return response()->json(['error' => 'Batalla no encontrada o finalizada']);
-        }
-
-        // Determinar quién actúa
-        // En modo IA: siempre es 'player' (la IA usa aiAction)
-        // En modo Local: puede ser 'player' o 'ai' (Jugador 2)
-
-        $actor = $battle['turn'];
-
-        if ($battle['mode'] === 'ai' && $actor !== 'player') {
-            return response()->json(['error' => 'No es tu turno']);
+        $validation = $this->validateBattleState($battle, $actor);
+        if (!$validation['valid']) {
+            return response()->json(['error' => $validation['error']]);
         }
 
         $action = $request->action;
@@ -912,5 +905,20 @@ class BattleController extends Controller
             }
         }
         return false;
+    }
+    /**
+     * Validar estado de la batalla y turno
+     */
+    private function validateBattleState($battle, $actor)
+    {
+        if (!$battle || $battle['winner']) {
+            return ['valid' => false, 'error' => 'Batalla no encontrada o finalizada'];
+        }
+
+        if ($battle['mode'] === 'ai' && $actor !== 'player') {
+            return ['valid' => false, 'error' => 'No es tu turno'];
+        }
+
+        return ['valid' => true];
     }
 }
