@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Helpers\PokemonHelper;
+use App\Models\Pokemon;
 
 class BattleService
 {
@@ -188,7 +189,7 @@ class BattleService
         for ($i = 0; $i < $size; $i++) {
             // Evitar duplicados en el equipo
             do {
-                $randomId = rand(1, 1025);
+                $randomId = rand(1, Pokemon::MAX_ID);
             } while (in_array($randomId, $usedIds));
             $usedIds[] = $randomId;
 

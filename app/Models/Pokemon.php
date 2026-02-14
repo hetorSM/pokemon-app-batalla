@@ -9,6 +9,8 @@ class Pokemon extends Model
     protected $table = 'pokemons';
     protected $fillable = ['api_id', 'name', 'base_experience', 'height', 'weight'];
 
+    public const MAX_ID = 1025;
+
     // Relationships
     public function types()
     {

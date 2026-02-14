@@ -4,6 +4,7 @@ namespace App\Helpers;
 
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Cache;
+use App\Models\Pokemon;
 
 class PokemonHelper
 {
@@ -593,7 +594,7 @@ class PokemonHelper
         }
     }
 
-    public static function getSimplePokemonList($limit = 1025)
+    public static function getSimplePokemonList($limit = Pokemon::MAX_ID)
     {
         $cacheKey = "simple_pokemon_list_{$limit}";
         $cached = Cache::get($cacheKey);
