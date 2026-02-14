@@ -255,13 +255,13 @@ class BattleService
     public function getEffectivenessMessage($effectiveness)
     {
         if ($effectiveness >= 2) {
-            return '¡Es súper eficaz!';
+            return __('battle.effectiveness.super_effective');
         }
         elseif ($effectiveness > 0 && $effectiveness < 1) {
-            return 'No es muy eficaz...';
+            return __('battle.effectiveness.not_very_effective');
         }
         elseif ($effectiveness == 0) {
-            return 'No afecta al Pokémon rival...';
+            return __('battle.effectiveness.no_effect');
         }
         return null;
     }

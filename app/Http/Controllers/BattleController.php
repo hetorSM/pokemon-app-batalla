@@ -314,7 +314,7 @@ class BattleController extends Controller
 
         // Verificar si se debilitó por estado
         if ($attackerTeam[$attackerIdx]['current_hp'] <= 0) {
-            $messages[] = "¡{$attackerName} se ha debilitado por el estado alterado!";
+            $messages[] = __('battle.combat.fainted_status', ['pokemon' => $attackerTeam[$attackerIdx]['name']]);
             $attackerTeam[$attackerIdx]['current_hp'] = 0;
 
             // Buscar siguiente para el atacante
@@ -325,13 +325,14 @@ class BattleController extends Controller
                 else
                     $battle['ai_active'] = $nextPokemon;
 
-                $messages[] = "¡Envías a {$attackerTeam[$nextPokemon]['name']}!";
+                $messages[] = __('battle.actions.switch_send', ['pokemon' => $attackerTeam[$nextPokemon]['name']]);
             }
 
             // Verificar si perdió
             if ($this->battleService->checkVictory($attackerTeam)) {
                 $battle['winner'] = ($actor === 'player') ? 'ai' : 'player';
-                $messages[] = "¡" . ($actor === 'player' ? "Jugador 2" : "Jugador 1") . " ha ganado!";
+                $winnerName = ($actor === 'player') ? "Jugador 2" : "Jugador 1";
+                $messages[] = __('battle.combat.win', ['winner' => $winnerName]);
                 $this->saveBattleState($battle, $messages);
                 return $this->battleJsonResponse($battle, $messages, 'status_damage');
             }
@@ -402,14 +403,14 @@ class BattleController extends Controller
                 $moveName = $move['name_es'] ?? ucfirst(str_replace('-', ' ', $move['name']));
 
                 if ($result['missed']) {
-                    $messages[] = "¡{$attackerName} usó {$moveName}, pero falló!";
+                    $messages[] = __('battle.combat.missed', ['attacker' => $attackerName, 'move' => $moveName]);
                 }
                 else {
                     $defenderTeam[$defenderIdx]['current_hp'] = max(0, $defPokemon['current_hp'] - $result['damage']);
-                    $messages[] = "¡{$attackerName} usó {$moveName}! (-{$result['damage']} HP)";
+                    $messages[] = __('battle.combat.used_move', ['attacker' => $attackerName, 'move' => $moveName, 'damage' => $result['damage']]);
 
                     if ($result['critical'])
-                        $messages[] = "¡Golpe crítico!";
+                        $messages[] = __('battle.combat.critical_hit');
                     if ($eff = $this->battleService->getEffectivenessMessage($result['effectiveness']))
                         $messages[] = $eff;
 
@@ -432,21 +433,21 @@ class BattleController extends Controller
                     if (!empty($move['is_struggle'])) {
                         $recoil = max(1, floor($result['damage'] / 4));
                         $attackerTeam[$attackerIdx]['current_hp'] = max(0, $atkPokemon['current_hp'] - $recoil);
-                        $messages[] = "¡{$attackerName} recibe {$recoil} de daño de retroceso!";
+                        $messages[] = __('battle.combat.recoil', ['attacker' => $attackerName, 'damage' => $recoil]);
                     }
                 }
 
                 // Verificar si el atacante se debilitó (por retroceso)
                 if ($attackerTeam[$attackerIdx]['current_hp'] <= 0) {
                     $attackerTeam[$attackerIdx]['current_hp'] = 0;
-                    $messages[] = "¡{$attackerName} se ha debilitado por el retroceso!";
+                    $messages[] = __('battle.combat.fainted_recoil', ['attacker' => $attackerName]);
 
                     if ($this->battleService->checkVictory($attackerTeam)) {
                         $battle['winner'] = ($actor === 'player') ? 'ai' : 'player';
                         $winMsg = ($actor === 'player') ? "Jugador 2/IA" : "Jugador 1";
                         if ($battle['mode'] === 'ai')
                             $winMsg = "La IA";
-                        $messages[] = "¡{$winMsg} ha ganado!";
+                        $messages[] = __('battle.combat.win', ['winner' => $winMsg]);
                         $this->saveBattleState($battle, $messages);
                         return $this->battleJsonResponse($battle, $messages, $action);
                     }
@@ -457,20 +458,21 @@ class BattleController extends Controller
                             $battle['player_active'] = $nextAtk;
                         else
                             $battle['ai_active'] = $nextAtk;
-                        $messages[] = "¡Envías a {$attackerTeam[$nextAtk]['name']}!";
+                        $messages[] = __('battle.actions.switch_send', ['pokemon' => $attackerTeam[$nextAtk]['name']]);
                     }
                 }
 
                 // Verificar si el Pokémon defensor se debilitó
                 if ($defenderTeam[$defenderIdx]['current_hp'] <= 0) {
-                    $messages[] = "¡{$defPokemon['name']} se ha debilitado!";
+                    $messages[] = __('battle.combat.fainted', ['pokemon' => $defPokemon['name']]);
                     $nextDef = $this->findNextAvailablePokemon($defenderTeam, $defenderIdx);
                     if ($nextDef !== false) {
                         if ($actor === 'player')
                             $battle['ai_active'] = $nextDef;
                         else
                             $battle['player_active'] = $nextDef;
-                        $messages[] = ($actor === 'player' ? "Jugador 2" : "Jugador 1") . " envía a {$defenderTeam[$nextDef]['name']}!";
+                        $trainerName = ($actor === 'player' ? "Jugador 2" : "Jugador 1");
+                        $messages[] = __('battle.actions.opponent_send', ['trainer' => $trainerName, 'pokemon' => $defenderTeam[$nextDef]['name']]);
                     }
                 }
                 break;
@@ -486,12 +488,12 @@ class BattleController extends Controller
                 foreach ($battle[$itemsArray] as $key => &$invItem) {
                     if ($invItem['id'] == $itemId && ($invItem['quantity'] ?? 0) > 0) {
                         if (!$this->itemService->canUseItem($itemId, $targetPokemon)) {
-                            return response()->json(['error' => 'No se puede usar este objeto ahora.']);
+                            return response()->json(['error' => __('battle.errors.cannot_use_item')]);
                         }
                         $useResult = $this->itemService->useItem($itemId, $attackerTeam[$targetIndex]);
                         if ($useResult['success']) {
                             $invItem['quantity']--;
-                            $messages[] = $useResult['message'];
+                            $messages[] = $useResult['message']; // This one comes from ItemService, might need refactor later too
                         }
                         else {
                             return response()->json(['error' => $useResult['message']]);
@@ -503,7 +505,7 @@ class BattleController extends Controller
                 unset($invItem);
 
                 if (!$itemFound) {
-                    return response()->json(['error' => 'No tienes ese objeto.']);
+                    return response()->json(['error' => __('battle.errors.item_not_found')]);
                 }
                 break;
 
@@ -516,21 +518,22 @@ class BattleController extends Controller
                         $battle['player_active'] = $target;
                     else
                         $battle['ai_active'] = $target;
-                    $messages[] = "¡{$attackerName} cambia a {$attackerTeam[$target]['name']}!";
+                    $messages[] = __('battle.actions.switch', ['attacker' => $attackerName, 'target' => $attackerTeam[$target]['name']]);
                 }
                 else {
-                    return response()->json(['error' => 'No puedes cambiar a ese Pokémon.']);
+                    return response()->json(['error' => __('battle.errors.cannot_switch')]);
                 }
                 break;
 
             default:
-                return response()->json(['error' => 'Acción no válida.']);
+                return response()->json(['error' => __('battle.errors.invalid_action')]);
         }
 
         // Verificar victoria (si se debilitó todo el equipo defensor)
         if ($this->battleService->checkVictory($defenderTeam)) {
             $battle['winner'] = $actor; // El que atacó ganó
-            $messages[] = "¡" . ($actor === 'player' ? "Jugador 1" : "Jugador 2") . " ha ganado!";
+            $winnerName = ($actor === 'player' ? "Jugador 1" : "Jugador 2");
+            $messages[] = __('battle.combat.win', ['winner' => $winnerName]);
             $this->saveBattleState($battle, $messages);
             return $this->battleJsonResponse($battle, $messages, $action, $animationData);
         }
@@ -557,7 +560,7 @@ class BattleController extends Controller
         $battle = session('current_battle');
 
         if (!$battle || $battle['turn'] !== 'ai' || $battle['winner']) {
-            return response()->json(['error' => 'No es el turno de la IA']);
+            return response()->json(['error' => __('battle.errors.not_ai_turn')]);
         }
 
         $aiIdx = $battle['ai_active'];
@@ -573,18 +576,18 @@ class BattleController extends Controller
 
         // Verificar si murió por daño de estado
         if ($battle['ai_team'][$aiIdx]['current_hp'] <= 0) {
-            $messages[] = "¡{$battle['ai_team'][$aiIdx]['name']} se ha debilitado!";
+            $messages[] = __('battle.combat.fainted', ['pokemon' => $battle['ai_team'][$aiIdx]['name']]);
             $battle['ai_team'][$aiIdx]['current_hp'] = 0;
 
             $nextAI = $this->findNextAvailablePokemon($battle['ai_team'], $aiIdx);
             if ($nextAI !== false) {
                 $battle['ai_active'] = $nextAI;
-                $messages[] = "La IA envía a {$battle['ai_team'][$nextAI]['name']}!";
+                $messages[] = __('battle.actions.opponent_send', ['trainer' => 'La IA', 'pokemon' => $battle['ai_team'][$nextAI]['name']]);
             }
 
             if ($this->battleService->checkVictory($battle['ai_team'])) {
                 $battle['winner'] = 'player';
-                $messages[] = "¡Has ganado la batalla!";
+                $messages[] = __('battle.combat.win', ['winner' => 'Jugador 1']);
                 foreach ($messages as $m)
                     $this->addToLog($m);
                 session(['current_battle' => $battle]);
@@ -628,7 +631,7 @@ class BattleController extends Controller
 
                 if ($moveIndex == -1 || empty($aiPokemon['moves'])) {
                     $move = $this->battleService->getStruggleMove();
-                    $messages[] = "¡{$aiPokemon['name']} usa Forcejeo!";
+                    $messages[] = __('battle.actions.struggle', ['attacker' => $aiPokemon['name']]);
                 }
                 else {
                     $moves = $aiPokemon['moves'];
@@ -638,7 +641,7 @@ class BattleController extends Controller
                     }
                     else {
                         $move = $this->battleService->getStruggleMove();
-                        $messages[] = "¡{$aiPokemon['name']} usa Forcejeo!";
+                        $messages[] = __('battle.actions.struggle', ['attacker' => $aiPokemon['name']]);
                     }
                 }
 
@@ -657,23 +660,24 @@ class BattleController extends Controller
                 $moveName = $move['name_es'] ?? ucfirst(str_replace('-', ' ', $move['name']));
 
                 if ($result['missed']) {
-                    $messages[] = "¡{$aiPokemon['name']} usó {$moveName}, pero falló!";
+                    $messages[] = __('battle.combat.missed', ['attacker' => $aiPokemon['name'], 'move' => $moveName]);
                 }
                 else {
                     if ($result['damage'] > 0) {
                         $battle['player_team'][$playerIdx]['current_hp'] = max(0, $playerPokemon['current_hp'] - $result['damage']);
-                        $messages[] = "¡{$aiPokemon['name']} usó {$moveName}! (-{$result['damage']} HP)";
+                        $messages[] = __('battle.combat.used_move', ['attacker' => $aiPokemon['name'], 'move' => $moveName, 'damage' => $result['damage']]);
 
                         $effMsg = $this->battleService->getEffectivenessMessage($result['effectiveness']);
                         if ($effMsg)
                             $messages[] = $effMsg;
 
                         if ($result['critical']) {
-                            $messages[] = "¡Golpe crítico!";
+                            $messages[] = __('battle.combat.critical_hit');
                         }
                     }
                     else {
-                        $messages[] = "¡{$aiPokemon['name']} usó {$moveName}!";
+                        // Movimiento de estado sin daño
+                        $messages[] = __('battle.combat.used_move', ['attacker' => $aiPokemon['name'], 'move' => $moveName, 'damage' => 0]);
                     }
 
                     // Aplicar efecto de estado
@@ -750,6 +754,7 @@ class BattleController extends Controller
                             $useResult = $this->itemService->useItem($itemId, $battle['ai_team'][$targetIndex]);
                             if ($useResult['success']) {
                                 $invItem['quantity']--;
+                                // "La IA: " prefix is still hardcoded here, pending ItemService refactor
                                 $messages[] = "La IA: " . $useResult['message'];
                             }
                             break;
@@ -765,7 +770,7 @@ class BattleController extends Controller
                 $target != $aiIdx &&
                 $this->battleService->canContinue($battle['ai_team'][$target])) {
                     $battle['ai_active'] = $target;
-                    $messages[] = "La IA cambia a {$battle['ai_team'][$target]['name']}!";
+                    $messages[] = __('battle.actions.switch', ['attacker' => 'La IA', 'target' => $battle['ai_team'][$target]['name']]);
                 }
                 break;
         }
@@ -773,7 +778,7 @@ class BattleController extends Controller
         // Verificar victoria de la IA
         if ($this->battleService->checkVictory($battle['player_team'])) {
             $battle['winner'] = 'ai';
-            $messages[] = "¡La IA ha ganado la batalla!";
+            $messages[] = __('battle.combat.win', ['winner' => 'La IA']);
             foreach ($messages as $m)
                 $this->addToLog($m);
             session(['current_battle' => $battle]);
