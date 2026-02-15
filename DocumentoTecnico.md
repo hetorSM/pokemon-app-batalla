@@ -61,6 +61,8 @@ El sistema sigue el patrón **MVC (Modelo-Vista-Controlador)**, pero enriquecido
 ./vendor/bin/sail composer require guzzlehttp/guzzle
 ```   
 
+<div class="page"/>
+
 ### Estructura de Directorios Clave y Responsabilidades
 
 ```text
@@ -113,6 +115,8 @@ La máquina no elige al azar (a menos que sea nivel Fácil). Evalúa el tablero 
     - *Cambio Estratégico:* Si su tipo es desventajoso (Planta contra tu Fuego), busca en su equipo un Pokémon resistente (ej. Agua) y cambia.
     - *Debuffs:* Intenta aplicar estados (quemar/envenenar) al inicio del combate si el rival está sano.
 
+<div class="page"/>
+
 ### 3.4. Características Avanzadas (Pokedex y Objetos)
 -   **Bio-Acústica (Cries):** Integración multimedia real. Al ver un Pokémon, `PokemonController` recupera la URL de su "grito" digitalizado de la tabla `pokemon_cries` para reproducirlo.
 -   **Gestión de Inventario:** `ItemService` maneja un sistema de objetos persistente en sesión. Permite usar Pociones (curan HP), Revivir (resucitan estado fainted) o Curas Totales (eliminan burn/poison/etc), afectando instantáneamente el estado del combate.
@@ -149,9 +153,12 @@ La interfaz es lo que conecta al usuario con toda esta lógica compleja.
 
 ## 6. Puntos Críticos y Futuras Mejoras
 
-1.  **Multijugador Real (WebSockets):** Actualmente el PvP es local (Hot-Seat). Para jugar online necesitaríamos **WebSockets** (usando Laravel Reverb o Pusher) para comunicación bidireccional en tiempo real entre clientes.
-2.  **Refactorización de Controladores:** Mover cierta lógica de flujos de sesión desde `BattleController` hacia una nueva clase `BattleSessionManager` para seguir estrictamente el principio de responsabilidad única.
-3.  **Frontend SPA (Vue.js):** Migrar de Blade a un framework reactivo como Vue.js o React permitiría una experiencia "app nativa", eliminando las recargas de página en cada turno y permitiendo animaciones más complejas.
+1.  **Multijugador Real (WebSockets con Laravel Reverb):**
+    Actualmente el PvP es local. La evolución natural es implementar **Laravel Reverb** (el nuevo servidor WebSocket nativo de Laravel 11). Esto permitiría canales privados seguros para que dos jugadores se envíen eventos de "Ataque Seleccionado" en tiempo real, manteniendo todo el stack en PHP.
+2.  **Optimización con Colas (Laravel Jobs):**
+    La carga inicial de datos desde PokéAPI puede ser lenta. Podemos implementar **Jobs y Queues** de Laravel para procesar estas importaciones en segundo plano (background), mejorando la respuesta del servidor y evitando timeouts.
+3.  **Evolución del Frontend (Laravel Livewire / Inertia):**
+    Para mantenernos en el ecosistema Laravel pero modernizar la UI, el siguiente paso lógico es **Livewire 3**. Nos permitiría tener componentes reactivos (como las barras de vida o el chat de batalla) escribiendo solo código PHP y Blade, sin la complejidad de separar una API para React/Vue.
 
 <div class="page"/>
 
