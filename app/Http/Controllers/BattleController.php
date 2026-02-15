@@ -94,6 +94,8 @@ class BattleController extends Controller
         // Jugador 1: Equipo de la sesión
         $playerTeamIds = array_slice(session('team', []), 0, $request->team_size);
         $playerTeam = [];
+        $p1Moves = $request->input('p1_moves', []);
+
         foreach ($playerTeamIds as $id) {
             $pokemon = PokemonHelper::getPokemon($id);
             if ($pokemon) {
@@ -179,10 +181,14 @@ class BattleController extends Controller
         // Preparar equipo del jugador con stats de nivel y movimientos reales
         $playerTeamIds = array_slice(session('team', []), 0, $request->team_size);
         $playerTeam = [];
-        foreach ($playerTeamIds as $id) {
+        $selectedMoves = $request->input('moves', []); // Array keyed by index
+
+        foreach ($playerTeamIds as $index => $id) {
             $pokemon = PokemonHelper::getPokemon($id);
             if ($pokemon) {
-                $playerTeam[] = $this->battleService->preparePokemonForBattle($pokemon, $level);
+                // Get moves for this specific pokemon index if available
+                $movesForPokemon = $selectedMoves[$index] ?? [];
+                $playerTeam[] = $this->battleService->preparePokemonForBattle($pokemon, $level, $movesForPokemon);
             }
         }
 
@@ -920,5 +926,22 @@ class BattleController extends Controller
         }
 
         return ['valid' => true];
+    }
+
+    /**
+     * Obtener movimientos de un Pokémon
+     */
+    public function getPokemonMoves($id)
+    {
+        $pokemon = PokemonHelper::getPokemon($id);
+        if (!$pokemon) {
+            return response()->json(['error' => 'Pokemon not found'], 404);
+        }
+
+        // Return all moves with details
+        return response()->json([
+            'moves' => $pokemon['moves_detailed'] ?? [],
+            'all_moves' => $pokemon['move_names'] ?? []
+        ]);
     }
 }

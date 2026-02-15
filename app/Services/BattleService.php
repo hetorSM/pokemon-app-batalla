@@ -218,14 +218,35 @@ class BattleService
     /**
      * Preparar Pokémon del jugador para batalla
      */
-    public function preparePokemonForBattle($pokemon, $level = 50)
+    public function preparePokemonForBattle($pokemon, $level = 50, $selectedMoves = [])
     {
         $battleStats = $this->calculateStatsForLevel($pokemon['stats'], $level);
         $pokemon['level'] = $level;
         $pokemon['battle_stats'] = $battleStats;
         $pokemon['current_hp'] = $battleStats['hp'];
         $pokemon['max_hp'] = $battleStats['hp'];
-        $pokemon['moves'] = PokemonHelper::selectBattleMoves($pokemon['id'], 4, $level);
+
+        // Custom moves logic
+        if (!empty($selectedMoves)) {
+            $pokemon['moves'] = [];
+            foreach ($selectedMoves as $moveName) {
+                // Verify move exists/is valid for this pokemon (optional strict check)
+                // For now, trust the input but ensure data integrity
+                $moveData = PokemonHelper::getOrFetchMove($moveName);
+                if ($moveData) {
+                    $pokemon['moves'][] = $moveData;
+                }
+            }
+            // Fill with struggles if for some reason moves are invalid? 
+            // Better to fill with defaults if empty
+            if (empty($pokemon['moves'])) {
+                $pokemon['moves'] = PokemonHelper::selectBattleMoves($pokemon['id'], 3, $level);
+            }
+        }
+        else {
+            $pokemon['moves'] = PokemonHelper::selectBattleMoves($pokemon['id'], 3, $level);
+        }
+
         $pokemon['status'] = null;
         $pokemon['status_turns'] = 0;
         $pokemon['stat_stages'] = [

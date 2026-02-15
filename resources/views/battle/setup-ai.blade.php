@@ -95,6 +95,7 @@
 
                     {{-- Start Button --}}
                     <div class="mt-4">
+                        <div id="movesHiddenInputs"></div>
                         <button type="submit" class="btn-pokemon-retro w-100 start-battle-btn">
                             ¡COMENZAR BATALLA!
                         </button>
@@ -143,6 +144,11 @@
                                     <span>PS: {{ $pokemon['stats']['hp'] }}</span>
                                     <span>ATK: {{ $pokemon['stats']['attack'] }}</span>
                                 </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2 moves-btn"
+                                    data-index="{{ $index }}"
+                                    onclick="openMovesModal({{ $index }}, {{ $pokemon['id'] }}, '{{ $pokemon['name'] }}')">
+                                    Configurar Movimientos
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -157,11 +163,37 @@
         </div>
     </div>
 </div>
+
+<!-- Moves Modal -->
+<div class="modal fade" id="movesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content config-panel">
+            <div class="modal-header">
+                <h5 class="modal-title" id="movesModalTitle">Seleccionar Movimientos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="modal-title">Selecciona hasta 4 movimientos.</span>
+                    <span class="badge bg-primary" id="movesModalCount">0/4</span>
+                </div>
+                <div id="movesContainer" class="moves-container-scroll">
+                    <!-- Moves will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/battle-setup.css') }}">
+
 @endpush
+
 
 @push('scripts')
 <script>
@@ -204,5 +236,138 @@
     }
 
     itemCheckboxes.forEach(cb => cb.addEventListener('change', updateItemCount));
+
+    // --- MOVE SELECTION LOGIC ---
+    let currentPokemonIndex = null;
+    const movesModal = new bootstrap.Modal(document.getElementById('movesModal'));
+    const movesContainer = document.getElementById('movesContainer');
+    const modalTitle = document.getElementById('movesModalTitle');
+
+    // Store selected moves: [index => [move1, move2...]]
+    let teamMoves = {};
+
+    function openMovesModal(index, pokemonId, pokemonName) {
+        currentPokemonIndex = index;
+        modalTitle.textContent = `Movimientos de ${pokemonName}`;
+        movesContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary"></div><p>Cargando movimientos...</p></div>';
+        movesModal.show();
+
+        fetch(`/battle/pokemon-moves/${pokemonId}`)
+            .then(res => res.json())
+            .then(data => {
+                renderMoves(data.moves, data.all_moves);
+            })
+            .catch(err => {
+                movesContainer.innerHTML = '<p class="text-danger text-center">Error al cargar movimientos.</p>';
+                console.error(err);
+            });
+    }
+
+    function renderMoves(detailedMoves, simpleMoves) {
+        movesContainer.innerHTML = '';
+        const currentSelection = teamMoves[currentPokemonIndex] || [];
+
+        // Combine moves to ensure we have a unique list
+        // Prefer detailed moves if available
+        let uniqueMoves = new Map();
+
+        detailedMoves.forEach(m => uniqueMoves.set(m.name, { name: m.name, level: m.level, method: m.method }));
+        simpleMoves.forEach(m => {
+            if (!uniqueMoves.has(m)) uniqueMoves.set(m, { name: m, level: 0, method: 'other' });
+        });
+
+        // Sort: Level up descending, then others
+        const sortedMoves = Array.from(uniqueMoves.values()).sort((a, b) => {
+            if (a.method === 'level-up' && b.method !== 'level-up') return -1;
+            if (a.method !== 'level-up' && b.method === 'level-up') return 1;
+            return b.level - a.level;
+        });
+
+        if (sortedMoves.length === 0) {
+            movesContainer.innerHTML = '<p class="text-center text-muted">No hay movimientos disponibles.</p>';
+            return;
+        }
+
+        const list = document.createElement('div');
+        list.className = 'moves-list-grid';
+
+        sortedMoves.forEach(move => {
+            const isSelected = currentSelection.includes(move.name);
+            const item = document.createElement('div');
+            item.className = `move-item ${isSelected ? 'selected' : ''}`;
+            item.onclick = () => toggleMove(move.name, item);
+
+            let badge = '';
+            if (move.method === 'level-up') badge = `<span class="badge bg-secondary" style="font-size:0.7em;">Nivel ${move.level}</span>`;
+            else badge = `<span class="badge bg-info text-dark" style="font-size:0.7em;">${move.method}</span>`;
+
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold" style="text-transform: capitalize;">${move.name.replace('-', ' ')}</span>
+                    ${badge}
+                </div>
+            `;
+            list.appendChild(item);
+        });
+
+        movesContainer.appendChild(list);
+        updateMoveCounter();
+    }
+
+    function toggleMove(moveName, element) {
+        if (!teamMoves[currentPokemonIndex]) teamMoves[currentPokemonIndex] = [];
+
+        const index = teamMoves[currentPokemonIndex].indexOf(moveName);
+        if (index > -1) {
+            teamMoves[currentPokemonIndex].splice(index, 1);
+            element.classList.remove('selected');
+        } else {
+            if (teamMoves[currentPokemonIndex].length >= 4) {
+                alert('¡Máximo 4 movimientos!');
+                return;
+            }
+            teamMoves[currentPokemonIndex].push(moveName);
+            element.classList.add('selected');
+        }
+        updateMoveCounter();
+        updateHiddenInputs();
+        updateButtonState(currentPokemonIndex);
+    }
+
+    function updateMoveCounter() {
+        const count = teamMoves[currentPokemonIndex] ? teamMoves[currentPokemonIndex].length : 0;
+        document.getElementById('movesModalCount').textContent = `${count}/4`;
+    }
+
+    function updateHiddenInputs() {
+        const container = document.getElementById('movesHiddenInputs');
+        container.innerHTML = '';
+
+        Object.keys(teamMoves).forEach(index => {
+            teamMoves[index].forEach(move => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = `moves[${index}][]`;
+                input.value = move;
+                container.appendChild(input);
+            });
+        });
+    }
+
+    function updateButtonState(index) {
+        const btn = document.querySelector(`.moves-btn[data-index="${index}"]`);
+        if (btn) {
+            const count = teamMoves[index] ? teamMoves[index].length : 0;
+            if (count > 0) {
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-primary');
+                btn.textContent = `Movimientos: ${count}`;
+            } else {
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-primary');
+                btn.textContent = 'Configurar Movimientos';
+            }
+        }
+    }
 </script>
 @endpush

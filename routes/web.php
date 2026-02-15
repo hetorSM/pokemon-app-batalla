@@ -41,6 +41,9 @@ Route::prefix('battle')->group(function () {
     // Arena de batalla
     Route::get('/arena', [BattleController::class , 'arena'])->name('battle.arena');
 
+    // Movimientos
+    Route::get('/pokemon-moves/{id}', [BattleController::class , 'getPokemonMoves'])->name('battle.pokemon.moves');
+
     // Acciones
     Route::post('/action', [BattleController::class , 'action'])->name('battle.action');
     Route::post('/ai-action', [BattleController::class , 'aiAction'])->name('battle.ai-action');
