@@ -23,100 +23,127 @@ Este proyecto es una aplicación web desarrollada en **Laravel 11** que simula u
 ```
 app/
 ├── Helpers/
-│   └── PokemonHelper.php       # Fachada de acceso a datos (API/DB/Cache)
+│   └── PokemonHelper.php       # Fachada principal de acceso a datos (Orquestador)
 ├── Http/
 │   └── Controllers/
-│       ├── BattleController.php # Orquestador de batallas (PvE y PvP Local)
-│       ├── PokemonController.php # Catálogo, búsqueda y detalles
-│       └── TeamController.php    # Gestión de equipo (Session-based)
+│       ├── BattleController.php # Controlador de Batalla (PvE y PvP)
+│       ├── PokemonController.php # Catálogo y Pokedex
+│       └── TeamController.php    # Gestión de Equipos
 ├── Models/
-│   ├── Pokemon.php             # Modelo Eloquent principal
-│   ├── Move.php                # Movimientos y sus detalles
-│   └── User.php                # Usuario del sistema
+│   ├── Pokemon.php             # Modelo Eloquent
+│   ├── Move.php                # Modelo de Movimientos
+│   └── User.php                # Modelo de Usuario
+├── Repositories/
+│   └── PokemonRepository.php   # Capa de persistencia y consulta a BD
 └── Services/
-    ├── BattleService.php       # Lógica core de batalla y estados
-    ├── BattleCalculator.php    # Cálculos matemáticos (Daño, Stats, Scores)
-    ├── AIService.php           # Lógica de decisión de la IA
-    ├── ItemService.php         # Lógica de objetos de batalla
-    └── StatusEffectService.php # Estados alterados (Veneno, Parálisis, etc.)
+    ├── AIService.php           # Inteligencia Artificial (Toma de decisiones)
+    ├── BattleService.php       # Lógica Core de Batalla (Reglas y Flujo)
+    ├── BattleCalculator.php    # Motor Matemático (Daño, Probabilidades)
+    ├── BattleLogService.php    # Sistema de Registro y Narrativa de Batalla
+    ├── ItemService.php         # Gestión y Efectos de Objetos
+    ├── PokeApiService.php      # Cliente HTTP para Pokédex Externa
+    └── StatusEffectService.php # Motor de Estados Alterados
 ```
 
 ---
 
 ## 3. Lógica de Negocio y Servicios
 
-### 3.1. Gestión de Datos (`PokemonHelper` y `PokemonRepository`)
-El `PokemonHelper` actúa como la única fuente de verdad, apoyándose en repositorios y servicios:
-1.  **Cache Hit:** Retorna datos cacheados para alto rendimiento.
-2.  **DB Hit:** Busca en base de datos local.
-3.  **API Fallback:** Consulta PokéAPI, procesa la respuesta masiva, guarda en DB (transaccional) y cachea.
-    -   *Evoluciones:* Se procesan cadenas de evolución completas.
-    -   *Movimientos:* Se filtran y clasifican por método de aprendizaje.
+### 3.1. Gestión de Datos (Fachada y Capas)
+El sistema utiliza un patrón de **Fachada** a través de `PokemonHelper`, que orquesta la obtención de datos:
+1.  **Caché (Redis/File):** Se consulta primero para maximizar el rendimiento.
+2.  **Base de Datos (Repository):** Si no hay caché, se busca en la BD local mediante `PokemonRepository`.
+3.  **API Externa (Service):** Si el dato no existe, `PokeApiService` consulta la PokéAPI.
+4.  **Persistencia y Normalización:** Los datos crudos de la API se procesan y normalizan (separando tipos, sprites y stats en tablas relacionales) antes de guardarse en la BD local para futuras consultas.
 
-### 3.2. Sistema de Batalla (`BattleService` y `BattleController`)
-Soporta dos modalidades principales: **PvE (Jugador vs IA)** y **PvP Local (Hotseat)**.
-
--   **Estado de Batalla:** Almacenado en Sesión (`current_battle`). Contiene arrays completos para `player_team` y `ai_team` (usado como Jugador 2 en PvP).
--   **Configuración PvP:**
-    -   Permite selección manual de equipos para ambos jugadores o generación aleatoria.
-    -   Validación estricta de movimientos y objetos seleccionados.
--   **Cálculo de Daño (`BattleCalculator`):**
-    -   Fórmula oficial de Pokémon (Nivel 50 por defecto).
-    -   Considera STAB, Efectividad de Tipos (x0.25 - x4), Críticos, Rangos de Rol (0.85-1.00) y Estados (Quemadura).
--   **Flujo de Turnos:**
-    1.  Validación de acción (Movimiento/Item/Cambio).
-    2.  Check de Estados (Status Effects) pre-turno.
-    3.  Ejecución de acción y cálculo de consecuencias.
-    4.  Switch forzado si un Pokémon se debilita.
-    5.  Verificación de victoria global.
+### 3.2. Sistema de Batalla
+El núcleo del juego reside en la interacción cooperativa de múltiples servicios:
+-   **`BattleService`:** Gestiona el estado global (turnos, validaciones, condiciones de victoria).
+-   **`BattleCalculator`:** Ejecuta las fórmulas de daño oficiales (Nivel 50), considerando STAB, efectividad de tipos, estados y varianza aleatoria.
+-   **`BattleLogService`:** Genera y persiste la narrativa del combate, alimentando el log textual que ven los jugadores.
+-   **`StatusEffectService`:** Procesa los efectos pre y post turno (veneno, quemadura, parálisis), aplicando daño residual o impidiendo acciones.
 
 ### 3.3. Inteligencia Artificial (`AIService`)
-Tres niveles de dificultad para PvE:
+La IA evalúa el estado del tablero para tomar decisiones estratégicas según la dificultad:
 -   **Easy:** Selección aleatoria válida.
--   **Normal:** Selección basada en daño potencial máximo.
--   **Hard:** Estrategia completa:
-    -   Uso inteligente de objetos curativos.
-    -   Predicción de cambios (Switching) ante desventaja de tipos.
-    -   Priorización de movimientos de estado y "Kill confirmation".
+-   **Normal:** Maximización de daño directo inmediato.
+-   **Hard:** Estrategia predictiva; considera cambios ante desventaja de tipos, uso de objetos curativos y prioridad de movimientos de estado.
 
-### 3.4. Objetos y Pokedex
--   **Items:** Sistema de inventario con efectos programados (Curación HP, Revivir, Curar Estado, Boost Stats). Visualización tipo "Logistics" en Pokedex.
--   **Cries:** Integración de sonidos de Pokémon ("Resonance Scan") en la vista de detalles.
+### 3.4. Características Avanzadas (Pokedex y Objetos)
+-   **Sistema de Sonido (Cries):** Integración de audio para los gritos de los Pokémon, almacenados y gestionados mediante la tabla `pokemon_cries`.
+-   **Gestión de Objetos:** Inventario persistente con lógica programada para efectos complejos (revivir, curar estados, restaurar PP).
 
 ---
 
 ## 4. Estructura de Base de Datos
-Datos normalizados para evitar dependencia constante de la API externa:
+Datos normalizados para optimizar el rendimiento y la integridad referencial, eliminando la dependencia de columnas JSON pesadas:
 
--   `pokemons`: Datos base (id, nombre, sprites, stats base).
--   `types` / `stats`: Catálogos maestros.
--   `moves`: Datos detallados de movimientos (poder, precisión, clase, efecto).
+-   `pokemons`: Datos base ligeros (id, nombre, altura, peso, experiencia base).
+-   `types` / `stats`: Catálogos maestros de tipos y estadísticas.
+-   `pokemon_types`: Relación pivot con el slot (tipo primario/secundario).
+-   `pokemon_stats`: Relación pivot con valores base de estadísticas.
 -   `pokemon_moves`: Relación pivot con detalles de aprendizaje (nivel, método).
--   `pokemon_stats`: Relación pivot para stats base.
+-   `pokemon_sprites`: Tabla dedicada para URLs de imágenes (front, back, shiny, artwork).
+-   `pokemon_cries`: Tabla dedicada para almacenamiento de URLs de audios.
 
 ---
 
 ## 5. Frontend (Blade & UI)
-La interfaz ha evolucionado hacia una estética "Silph Co." inmersiva.
+La interfaz ha evolucionado hacia una estética "Silph Co." inmersiva (Cyberpunk/Sci-Fi).
 
--   **Team Management (`team/index`):**
-    -   Diseño de "Biometric Containment Units".
-    -   Grid interactivo con medidores de estadísticas en tiempo real.
-    -   Panel de "Fleet Sync Analysis" (Promedios del equipo).
--   **Pokedex (`pokemon/index` & `show`):**
-    -   Vista de detalle estilo "Terminal de Datos".
-    -   Gráficos de barras animados para Stats.
-    -   Reproducción de audio (Cries).
-    -   Tablas de movimientos separadas por Natural (Nivel) y Técnico (MT/Tutor).
--   **Battle Arena:**
-    -   Logs de batalla detallados.
-    -   Animaciones de sprites y barras de salud reactivas (colores de estado crítico).
-    -   Controles dinámicos según el estado del turno.
+-   **Team Management (Command Center):** Interfaz de gestión táctica con medidores de estadísticas en tiempo real y análisis de equipo.
+-   **Pokedex (Data Terminal):** Visualización de datos técnicos, gráficos animados de stats y reproducción de bio-acústica (Gritos).
+-   **Battle Arena:** HUD reactivo con barras de salud dinámicas, animaciones de sprites y log de combate en tiempo real.
 
 ---
 
 ## 6. Puntos Críticos y Futuras Mejoras
-1.  **Monolito en Controlador:** `BattleController` sigue manejando mucha lógica de orquestación, aunque se ha delegado cálculo a servicios.
-2.  **Persistencia Volátil:** El uso de Sesiones limita la escalabilidad a partidas asíncronas o multijugador online real.
-3.  **Hardcoded Data Logic:** Algunas configuraciones de tipos y objetos residen en arrays PHP (`BattleService`), lo que requiere despliegue para cambios de balance.
-4.  **Complejidad Frontend:** La mezcla de lógica PHP en vistas Blade para lograr la estética compleja dificulta la migración a un framework JS completo (Vue/React) en el futuro.
+1.  **Refactorización de Controlador:** `BattleController` aún mantiene responsabilidad en la orquestación de flujos PvP que podría delegarse a un `BattleFlowService`.
+2.  **Escalabilidad de Sesiones:** La dependencia de sesiones PHP limita la implementación de multijugador online en tiempo real (WebSockets).
+3.  **Lógica de Selección de Movimientos:** Existe lógica heredada en `PokemonHelper` para la selección de movimientos de Pokémon salvajes que debería migrarse completamente a `BattleCalculator`.
+4.  **Modernización Frontend:** Considerar la migración progresiva de Blade a Vue.js 3 para manejar estados de batalla complejos de manera más reactiva.
+
+---
+
+## 7. USO DE IA EN EL PROYECTO
+
+### Herramientas y Modelos Utilizados
+Para el desarrollo de este proyecto se han utilizado diversas herramientas de Inteligencia Artificial como **DeepSeek**, **GitHub Copilot**, **ChatGPT**, **Claude** y, de manera destacada, **Gemini (Google DeepMind)** como asistente principal para arquitectura y lógica compleja.
+
+### Descripción de Uso
+La IA ha actuado como un "Assistant Lead Developer" en múltiples facetas:
+
+-   **Depuración de Lógica Compleja:** Identificación y resolución de errores críticos en `BattleService`, lógica de daño y gestión de turnos asíncronos.
+-   **Diseño de Arquitectura:** Implementación de patrones de diseño como **Repository** y **Service Layers**, asegurando un código modular y mantenible.
+-   **Normalización de Base de Datos:** Detección de cuellos de botella y generación de migraciones para transicionar de estructuras JSON a un modelo relacional robusto.
+-   **Generación de Código:** Creación acelerada de boilerplate para controladores, modelos y vistas, optimizando el tiempo de desarrollo.
+-   **Diseño de Interfaz (UI/UX):** Conceptualización de la estética "Silph Co." y generación de estilos CSS avanzados para animaciones y layouts.
+-   **Documentación:** Redacción y estructuración de documentación técnica detallada y análisis de código estático.
+
+### Prompts Significativos
+-   *"Analiza el proyecto completo y actualiza el Documento Técnico reflejando la arquitectura actual."*
+-   *"El jugador 2 siempre usa Forcejeo en batalla local, investiga el flujo de datos en `BattleService` y propón una solución robusta."*
+-   *"Diseña una interfaz estilo 'Command Center' de Silph Co. para la gestión de equipos Pokémon, priorizando una estética oscura y técnica."*
+-   *"Crea un sistema de logs de batalla desacoplado en `BattleLogService`."*
+
+---
+
+## 8. REFLEXIÓN PERSONAL
+
+### Experiencia de Programar con IA
+Programar asistido por IA ha transformado el flujo de trabajo de "escribir código" a "orquestar soluciones". De ser quien escribe el código, al que supervisa el código como si fuera el jefe del proyecto, supervisando el trabajo de los integrantes del equipo. La experiencia ha sido genial, permitiendo abordar una lógica de batalla compleja, logrando una imitación de las mecánicas oficiales de Pokémon. Trabajando con IA, he logrado resolver problemas complejos en una fracción del tiempo que hubiera tomado manualmente. La IA actúa como un compañero de programación (Pair Programmer) siempre disponible, capaz de sugerir alternativas, detectar errores sutiles y explicar conceptos oscuros de frameworks o librerías. No todo ha sido perfecto, ya que a veces la IA propone soluciones que no son las más óptimas o que requieren de una explicación adicional para entenderlas. Y ha veces la IA propone soluciones que no son las más óptimas, las cuales destruyen la funcionalidad del proyecto. Gracias al control de versiones, he podido revertir los cambios y continuar con el proyecto. Y seguir aprendiendo a usar la IA en el desarrollo de software.
+
+### Dificultades y Ventajas Encontradas
+
+**Ventajas:**
+-   **Velocidad de Iteración:** La capacidad de generar prototipos funcionales de UI o lógica de backend en minutos.
+-   **Reducción de Carga Cognitiva:** Delegar la memorización de sintaxis específica o configuraciones repetitivas permite concentrarse en la arquitectura y la experiencia de usuario.
+-   **Aprendizaje Continuo:** La IA sugiere patrones de diseño (como Repositorios o Servicios) que elevan la calidad del código y sirven como herramienta educativa.
+
+**Dificultades:**
+-   **Pérdida de Contexto:** En sesiones largas o proyectos grandes, la IA a veces "olvida" decisiones de diseño anteriores o correcciones aplicadas, reintroduciendo bugs antiguos.
+-   **Alucinaciones:** Ocasionalmente sugiere métodos de Laravel o CSS que no existen o están deprecados, requiriendo verificación constante.
+-   **Dependencia en Depuración:** A veces es tentador pedir a la IA que arregle un error sin entenderlo completamente, lo que puede llevar a soluciones "parche" en lugar de arreglos de raíz.
+
+### Influencia de la IA en el Futuro como Desarrollador
+La integración de la IA en el desarrollo de software parece inevitable y positiva. En mi futuro como desarrollador, veo a la IA no como un reemplazo, sino como un multiplicador de fuerza. El rol evolucionará de ser un "codificador" puro a un perfil más arquitectónico y de revisión, donde la habilidad clave será saber *qué* pedir, *cómo* evaluar la calidad del código generado y *cómo* integrar piezas complejas en un sistema coherente. La IA permitirá construir software más ambicioso, robusto y creativo, eliminando las barreras de entrada técnicas para materializar ideas complejas.
