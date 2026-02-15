@@ -91,51 +91,146 @@ class BattleController extends Controller
 
         $level = $request->level ?? 50;
 
-        // Jugador 1: Equipo de la sesión
-        $playerTeamIds = array_slice(session('team', []), 0, $request->team_size);
+        // Jugador 1: Equipo
         $playerTeam = [];
         $p1Moves = $request->input('p1_moves', []);
 
-        foreach ($playerTeamIds as $id) {
-            $pokemon = PokemonHelper::getPokemon($id);
-            if ($pokemon) {
-                $playerTeam[] = $this->battleService->preparePokemonForBattle($pokemon, $level);
+        if ($request->input('p1_mode') === 'manual') {
+            $p1Ids = $request->input('p1_pokemon');
+
+            // Strict Validation for P1 Manual
+            if (!is_array($p1Ids) || count($p1Ids) != $request->team_size) {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Error en Jugador 1: Debes seleccionar todos los Pokémon para el modo manual.');
+            }
+
+            foreach ($p1Ids as $index => $id) {
+                if (!$id) {
+                    return redirect()->back()->withInput()->with('error', 'Error en Jugador 1: Faltan Pokémon por seleccionar.');
+                }
+                $pokemon = PokemonHelper::getPokemon($id);
+                if ($pokemon) {
+                    $moves = $p1Moves[$index] ?? [];
+                    $playerTeam[] = $this->battleService->preparePokemonForBattle($pokemon, $level, $moves);
+                }
             }
         }
-
-        // Jugador 2: Equipo
-        $aiTeam = [];
-        if ($request->input('p2_mode') === 'manual' && $request->has('p2_pokemon')) {
-            $p2Ids = $request->input('p2_pokemon');
-            // Validar que sean correctos
-            if (is_array($p2Ids) && count($p2Ids) == $request->team_size) {
-                foreach ($p2Ids as $id) {
-                    $pokemon = PokemonHelper::getPokemon($id);
-                    if ($pokemon) {
-                        $aiTeam[] = $this->battleService->preparePokemonForBattle($pokemon, $level);
-                    }
+        else {
+            // Session Team (Default)
+            $sessionTeamIds = session('team', []);
+            $playerTeamIds = array_slice($sessionTeamIds, 0, $request->team_size, true);
+            foreach ($playerTeamIds as $index => $id) {
+                $pokemon = PokemonHelper::getPokemon($id);
+                if ($pokemon) {
+                    $moves = $p1Moves[$index] ?? [];
+                    $playerTeam[] = $this->battleService->preparePokemonForBattle($pokemon, $level, $moves);
                 }
             }
         }
 
-        // Si falló la manual o es aleatorio
-        if (empty($aiTeam)) {
+        // Final check for P1 Team integrity
+        if (count($playerTeam) != $request->team_size) {
+            return redirect()->back()->withInput()->with('error', 'Error: El equipo del Jugador 1 no está completo.');
+        }
+
+
+        // Jugador 2: Equipo
+        $aiTeam = [];
+        $p2Moves = $request->input('p2_moves', []);
+
+        if ($request->input('p2_mode') === 'manual') {
+            $p2Ids = $request->input('p2_pokemon');
+
+            // Strict Validation for P2 Manual
+            if (!is_array($p2Ids) || count($p2Ids) != $request->team_size) {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Error en Jugador 2: Debes seleccionar todos los Pokémon para el modo manual.');
+            }
+
+            foreach ($p2Ids as $index => $id) {
+                if (!$id) {
+                    return redirect()->back()->withInput()->with('error', 'Error en Jugador 2: Faltan Pokémon por seleccionar.');
+                }
+                $pokemon = PokemonHelper::getPokemon($id);
+                if ($pokemon) {
+                    $moves = $p2Moves[$index] ?? [];
+                    $aiTeam[] = $this->battleService->preparePokemonForBattle($pokemon, $level, $moves);
+                }
+            }
+        }
+        else {
+            // Random Team
             $aiTeam = $this->battleService->generateRandomTeam($request->team_size, $level);
         }
 
-        // Objetos "Starter Kit" para batalla local (Limitados)
-        $starterKit = [
-            1 => 2, // Poción (x2)
-            2 => 1, // Superpoción (x1)
-            11 => 1, // Revivir (x1)
-            13 => 1, // Ataque X (x1)
-        ];
+        // Final check for P2 Team integrity
+        if (count($aiTeam) != $request->team_size) {
+            return redirect()->back()->withInput()->with('error', 'Error: El equipo del Jugador 2 no se pudo generar correctamente.');
+        }
 
-        $sandboxItems = [];
-        foreach ($starterKit as $id => $qty) {
-            $item = $this->itemService->getItem($id);
-            if ($item) {
-                $sandboxItems[] = array_merge($item, ['quantity' => $qty]);
+        // Objetos Personalizados
+        $processItems = function ($inputItems) {
+            $items = [];
+            foreach ($inputItems as $id) {
+                $item = $this->itemService->getItem((int)$id);
+                if ($item) {
+                    // Check if item already exists to increment quantity, or add new
+                    // Simple approach: Add as separate entries, but the battle system expects unique items with quantity?
+                    // Verify startAIBattle logic: it adds array_merge($item, ['quantity' => 1]).
+                    // Let's aggregate quantities.
+                    $found = false;
+                    foreach ($items as &$existing) {
+                        if ($existing['id'] === $item['id']) {
+                            $existing['quantity']++;
+                            $found = true;
+                            break;
+                        }
+                    }
+                    if (!$found) {
+                        $items[] = array_merge($item, ['quantity' => 1]);
+                    }
+                }
+            }
+            return $items;
+        };
+
+        $playerItems = $processItems($request->input('p1_items', []));
+        $aiItems = $processItems($request->input('p2_items', []));
+
+        // Fallback to Starter Kit if no items selected (Optional, or just empty?)
+        // Let's say if completely empty and mode wasn't explicit, maybe strictly follow input.
+        // But for local multiplayer, if they select nothing, they get nothing. 
+        // Logic in current code was providing a starter kit. 
+        // Let's keep starter kit ONLY if NOT custom items provided? 
+        // Actually, the plan implies full customization. If they pick nothing, they get nothing.
+        // But to be user friendly, let's just use what they sent. 
+        // If they send nothing, empty bag.
+        // EXCEPT: The user might expect the "Sandbox Mode" described in the UI previously.
+        // The implementation plan says "Check for p1_items... If present, use these...".
+        // So if empty, maybe default to starter kit? 
+        // Let's stick to: If p1_items is present (even empty array if sent), use it. 
+        // But HTML checkboxes usually don't send anything if unchecked.
+        // We can check if 'p1_items_submitted' flag exists or just check if array is present.
+        // Let's assume if they customize, they send something.
+        // For backward compatibility or ease, let's keep Starter Kit if request input is null.
+
+        if (!$request->has('p1_items')) {
+            $starterKit = [1 => 2, 2 => 1, 11 => 1, 13 => 1];
+            foreach ($starterKit as $id => $qty) {
+                $item = $this->itemService->getItem($id);
+                if ($item)
+                    $playerItems[] = array_merge($item, ['quantity' => $qty]);
+            }
+        }
+
+        if (!$request->has('p2_items')) {
+            $starterKit = [1 => 2, 2 => 1, 11 => 1, 13 => 1];
+            foreach ($starterKit as $id => $qty) {
+                $item = $this->itemService->getItem($id);
+                if ($item)
+                    $aiItems[] = array_merge($item, ['quantity' => $qty]);
             }
         }
 
@@ -150,8 +245,8 @@ class BattleController extends Controller
             'turn' => 'player', // Empieza Jugador 1
             'log' => [],
             'winner' => null,
-            'player_items' => $sandboxItems,
-            'ai_items' => $sandboxItems,
+            'player_items' => $playerItems,
+            'ai_items' => $aiItems,
             'turn_number' => 1,
         ];
 

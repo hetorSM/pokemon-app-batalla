@@ -132,11 +132,12 @@
                         <button class="move-btn {{ !$hasPP ? 'no-pp' : '' }}" style="--move-color: {{ $moveColor }}" {{
                             !$hasPP ? 'disabled' : '' }}
                             onclick="performAction('move', {move_index: {{ $idx }}}, '{{ $side }}')">
-                            <span class="move-name">{{ strtoupper($move['name_es'] ?? $move['name']) }}</span>
+                            <span class="move-name">{{ strtoupper($move['name_es'] ?? $move['name'] ?? '???') }}</span>
                             <span class="move-meta">
                                 <span class="move-type-tag" style="background:{{ $moveColor }}">{{
                                     strtoupper($move['type'] ?? 'NORMAL') }}</span>
-                                <span class="move-pp">PP {{ $move['current_pp'] }}/{{ $move['pp'] }}</span>
+                                <span class="move-pp">PP {{ $move['current_pp'] ?? $move['pp'] ?? 0 }}/{{ $move['pp'] ??
+                                    0 }}</span>
                             </span>
                         </button>
                         @endforeach

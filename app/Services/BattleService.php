@@ -202,6 +202,11 @@ class BattleService
                 $pokemon['current_hp'] = $battleStats['hp'];
                 $pokemon['max_hp'] = $battleStats['hp'];
                 $pokemon['moves'] = PokemonHelper::selectBattleMoves($randomId, 4, $level);
+                // Initialize current_pp for randomly selected moves
+                foreach ($pokemon['moves'] as &$move) {
+                    $move['current_pp'] = $move['pp'] ?? 35;
+                }
+                unset($move); // Unset reference to avoid unexpected behavior
                 $pokemon['status'] = null;
                 $pokemon['status_turns'] = 0;
                 $pokemon['stat_stages'] = [
@@ -234,6 +239,7 @@ class BattleService
                 // For now, trust the input but ensure data integrity
                 $moveData = PokemonHelper::getOrFetchMove($moveName);
                 if ($moveData) {
+                    $moveData['current_pp'] = $moveData['pp'] ?? 35; // Ensure current_pp is set
                     $pokemon['moves'][] = $moveData;
                 }
             }
