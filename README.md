@@ -7,6 +7,7 @@
 Este proyecto utiliza **Laravel Sail**, lo que facilita su ejecución mediante Docker sin necesidad de instalar PHP o Composer localmente.
 
 ### Requisitos Previos
+
 - Docker Desktop instalado y corriendo.
 - Git.
 
